@@ -33,8 +33,10 @@ export function currentPath() {
 
 function toRegex(pattern) {
   const rx = pattern
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/\\\/:([A-Za-z_]+)/g, "/([^/]+)");
+    .split("/")
+    .map((seg) =>
+      seg.startsWith(":") ? "([^/]+)" : seg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("/");
   return new RegExp("^" + rx + "/?$");
 }
 function keysOf(pattern) {
