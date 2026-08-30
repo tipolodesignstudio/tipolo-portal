@@ -28,9 +28,11 @@ That one file bundles all six migrations:
 | `0003_rls_policies.sql` | Row-level security (any logged-in user = full access) |
 | `0004_functions.sql` | `next_invoice_number()` helper |
 | `0005_seed_settings.sql` | Creates the settings row with BC tax lines (GST 5% + PST 7%) |
+| `0006_time_entries.sql` | Timesheet entries table (Phase 2) |
 
 *(If you'd rather run them one at a time, the individual files are in
-`supabase/migrations/` — run them in numeric order.)*
+`supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
+just re-run `schema.sql` or the new file.)*
 
 ## 3. Configure Auth
 

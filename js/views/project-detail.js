@@ -1,9 +1,10 @@
 // Project detail: overview, deliverables checklist, and tabs (Time/Invoices/Proposals
 // fill in during later phases).
-import { escapeHtml, money, date, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
+import { escapeHtml, money, date, minutesToHM, minutesToHours, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getProject, updateProject, getSettings, effectiveRate } from "../core/api.js";
+import { getProject, updateProject, getSettings, effectiveRate, listProjectTime } from "../core/api.js";
 import { editProject } from "./projects.js";
+import { editTimeEntry, confirmDeleteEntry } from "./time-entry-modal.js";
 import { toastErr } from "../components/toast.js";
 
 export async function render(root, ctx) {
@@ -108,11 +109,67 @@ export async function render(root, ctx) {
       input.value = "";
       renderDeliverables(); persist();
     });
+  } else if (tab === "time") {
+    await renderTimeTab(pane, p, ctx);
   } else {
-    const phase = { time: "Phase 2", invoices: "Phase 3", proposals: "Phase 4" }[tab];
+    const phase = { invoices: "Phase 3", proposals: "Phase 4" }[tab];
     pane.innerHTML = `<div class="empty"><h3>${tab[0].toUpperCase() + tab.slice(1)}</h3>
       <p class="faint">Arrives in ${phase}.</p></div>`;
   }
 
   on(root, "click", "[data-edit]", () => editProject({ id }, () => ctx.navigate(ctx.path)));
+}
+
+async function renderTimeTab(pane, project, ctx) {
+  pane.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading time…</div>`;
+  const reload = () => renderTimeTab(pane, project, ctx);
+
+  let entries;
+  try { entries = await listProjectTime(project.id); }
+  catch (err) { pane.innerHTML = `<div class="empty"><p class="faint">${escapeHtml(err.message)}</p></div>`; return; }
+
+  const total = entries.reduce((s, e) => s + e.minutes, 0);
+  const billableMin = entries.filter((e) => e.billable).reduce((s, e) => s + e.minutes, 0);
+  const unbilledVal = entries
+    .filter((e) => e.billable && !e.invoice_id)
+    .reduce((s, e) => s + (e.minutes / 60) * (e.rate || 0), 0);
+
+  pane.innerHTML = `
+    <div class="grid-cards" style="margin-bottom:14px">
+      <div class="stat"><div class="k">Total logged</div><div class="v">${minutesToHours(total)} h</div><div class="d">${minutesToHM(total)}</div></div>
+      <div class="stat"><div class="k">Billable</div><div class="v">${minutesToHours(billableMin)} h</div></div>
+      <div class="stat"><div class="k">Unbilled value</div><div class="v">${money(unbilledVal)}</div></div>
+    </div>
+    <div class="between" style="margin-bottom:10px">
+      <h2 class="mt-0">Entries</h2>
+      <button class="btn sm" data-log-here>+ Log time</button>
+    </div>
+    ${entries.length ? `
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Date</th><th>Description</th><th class="num">Hours</th><th class="num">Rate</th><th></th></tr></thead>
+        <tbody>
+          ${entries.map((e) => `
+            <tr>
+              <td class="nowrap">${date(e.entry_date)}</td>
+              <td>${escapeHtml(e.description || "—")}
+                ${e.billable ? "" : ` <span class="badge grey">non-billable</span>`}
+                ${e.invoice_id ? ` <span class="badge green">billed</span>` : ""}</td>
+              <td class="num">${minutesToHM(e.minutes)}</td>
+              <td class="num">${e.rate != null ? money(e.rate) : "—"}</td>
+              <td class="right nowrap">
+                <button class="btn link" data-edit-te="${e.id}">edit</button>
+                <button class="btn link" data-del-te="${e.id}">del</button>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table></div>` : `<div class="empty"><p class="faint">No time logged on this project yet.</p></div>`}`;
+
+  const map = new Map(entries.map((e) => [e.id, e]));
+  on(pane, "click", "[data-log-here]", () =>
+    editTimeEntry({ prefill: { project_id: project.id }, onSaved: reload }));
+  on(pane, "click", "[data-edit-te]", (e, el) => {
+    const ex = map.get(el.dataset.editTe);
+    if (ex) editTimeEntry({ existing: ex, onSaved: reload });
+  });
+  on(pane, "click", "[data-del-te]", (e, el) => confirmDeleteEntry(el.dataset.delTe, reload));
 }

@@ -130,13 +130,81 @@ export async function getDashboardStats() {
   const byStatus = {};
   for (const p of rows) byStatus[p.status] = (byStatus[p.status] || 0) + 1;
 
+  // unbilled billable time this month + all-time (Phase 2)
+  let unbilled = { minutesMonth: 0, valueMonth: 0, minutesAll: 0, valueAll: 0 };
+  try {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    const te = await supabase
+      .from("time_entries")
+      .select("minutes, rate, entry_date")
+      .is("invoice_id", null)
+      .eq("billable", true);
+    if (!te.error) {
+      const ms = monthStart.toISOString().slice(0, 10);
+      for (const e of te.data || []) {
+        const val = (e.minutes / 60) * (e.rate || 0);
+        unbilled.minutesAll += e.minutes;
+        unbilled.valueAll += val;
+        if (e.entry_date >= ms) { unbilled.minutesMonth += e.minutes; unbilled.valueMonth += val; }
+      }
+    }
+  } catch { /* time_entries table may not exist yet */ }
+
   return {
     activeClients: clientsActive.count ?? 0,
     activeProjects: byStatus.active || 0,
     totalProjects: rows.length,
     byStatus,
     recent: rows.slice(0, 6),
+    unbilled,
   };
+}
+
+/* ---------------- time entries ---------------- */
+
+const TE_SELECT = "*, project:projects(id, title, scope, client:clients(id, name))";
+
+export async function listTimeEntries({ from, to, projectId = "", billable = "", billed = "" } = {}) {
+  let q = supabase.from("time_entries").select(TE_SELECT).order("entry_date", { ascending: false });
+  if (from) q = q.gte("entry_date", from);
+  if (to) q = q.lte("entry_date", to);
+  if (projectId) q = q.eq("project_id", projectId);
+  if (billable === "yes") q = q.eq("billable", true);
+  if (billable === "no") q = q.eq("billable", false);
+  if (billed === "unbilled") q = q.is("invoice_id", null);
+  if (billed === "billed") q = q.not("invoice_id", "is", null);
+  return unwrap(await q);
+}
+
+export async function listProjectTime(projectId) {
+  return unwrap(
+    await supabase.from("time_entries").select("*").eq("project_id", projectId)
+      .order("entry_date", { ascending: false })
+  );
+}
+
+export async function createTimeEntry(patch) {
+  return unwrap(await supabase.from("time_entries").insert(patch).select(TE_SELECT).single());
+}
+
+export async function updateTimeEntry(id, patch) {
+  return unwrap(await supabase.from("time_entries").update(patch).eq("id", id).select(TE_SELECT).single());
+}
+
+export async function deleteTimeEntry(id) {
+  const { error } = await supabase.from("time_entries").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/* projects the user can log against (not archived/complete), lightweight */
+export async function listActiveProjectsLite() {
+  return unwrap(
+    await supabase.from("projects")
+      .select("id, title, scope, hourly_rate, client:clients(id, name, default_rate)")
+      .not("status", "in", "(archived,complete)")
+      .order("title")
+  );
 }
 
 /* ---------------- storage (branding logo) ---------------- */

@@ -373,3 +373,49 @@ dialog.modal .m-foot { display: flex; justify-content: flex-end; gap: 10px; padd
 .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; font-size: 0.92rem; }
 .kv dt { color: var(--ink-faint); }
 .kv dd { color: var(--ink); }
+
+/* ---------- timer widget ---------- */
+.timer-widget { display: flex; align-items: center; }
+.timer-running {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-alt); border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 0.85rem;
+}
+.timer-running .dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--error-ink);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.timer-running .t-proj {
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.timer-running .t-clock { font-variant-numeric: tabular-nums; font-weight: 500; }
+@media (max-width: 820px) { .timer-running .t-proj { max-width: 90px; } }
+
+/* ---------- timesheet week grid ---------- */
+.week-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px;
+}
+@media (max-width: 1000px) { .week-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .week-grid { grid-template-columns: 1fr; } }
+.day-block {
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.day-head {
+  display: flex; justify-content: space-between; padding: 8px 10px;
+  background: var(--bg-alt); font-size: 0.8rem; font-weight: 500;
+  border-bottom: 1px solid var(--border-soft);
+}
+.day-empty { padding: 12px 10px; font-size: 0.82rem; }
+.te-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 8px;
+  padding: 8px 10px; border-bottom: 1px solid var(--border-soft);
+}
+.te-row:last-child { border-bottom: none; }
+.te-desc { font-size: 0.86rem; }
+.te-meta { font-size: 0.76rem; margin-top: 2px; }
+.te-dur { font-size: 0.86rem; font-variant-numeric: tabular-nums; align-self: start; }
+.te-acts { grid-column: 1 / -1; display: flex; gap: 10px; }
+.te-acts .btn.link { font-size: 0.78rem; }
+.week-totals { margin-top: 14px; }

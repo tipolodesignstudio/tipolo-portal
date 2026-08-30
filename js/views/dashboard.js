@@ -1,5 +1,5 @@
 // Dashboard: live counts + project pipeline. Grows with $ figures in Phases 2–3.
-import { escapeHtml, relTime, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
+import { escapeHtml, relTime, money, minutesToHours, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
 import { getDashboardStats, getSettings, getMyProfile } from "../core/api.js";
 
@@ -38,7 +38,10 @@ export async function render(root, ctx) {
         <div class="k">Active clients</div><div class="v">${stats.activeClients}</div></a>
       <a class="stat" href="#/projects?status=active" style="text-decoration:none" data-nav-soft>
         <div class="k">Active projects</div><div class="v">${stats.activeProjects}</div></a>
-      <div class="stat"><div class="k">Unbilled hours</div><div class="v faint">—</div><div class="d">Phase 2</div></div>
+      <a class="stat" href="#/timesheets" style="text-decoration:none">
+        <div class="k">Unbilled hours</div>
+        <div class="v">${minutesToHours(stats.unbilled?.minutesAll || 0, 1)}</div>
+        <div class="d">${money(stats.unbilled?.valueAll || 0)} · ${money(stats.unbilled?.valueMonth || 0)} this month</div></a>
       <div class="stat"><div class="k">Outstanding</div><div class="v faint">—</div><div class="d">Phase 3</div></div>
     </div>
 

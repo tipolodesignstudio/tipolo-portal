@@ -59,7 +59,7 @@ supabase/migrations/       SQL — run in the Supabase SQL editor, in order
 |-------|-------|--------|
 | 0 | Auth, app shell, Settings, deploy | ✅ built |
 | 1 | Clients + Projects + Dashboard stats | ✅ built |
-| 2 | Timesheets + timer | planned |
+| 2 | Timesheets + timer | ✅ built |
 | 3 | Invoices + tax + numbering | planned |
 | 4 | Proposal templates | planned |
 

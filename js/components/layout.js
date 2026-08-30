@@ -1,6 +1,7 @@
 // Renders the authenticated app shell (sidebar + topbar) and returns the view outlet.
 import { escapeHtml } from "../core/format.js";
 import { signOut } from "../core/auth.js";
+import { mountTimer } from "./timer.js";
 
 const NAV = [
   { path: "/",           label: "Dashboard",  ic: "◱" },
@@ -44,9 +45,12 @@ export function renderShell(appRoot, { email }) {
     // onAuthChange in app.js will swap back to the login view
   });
 
+  const actions = appRoot.querySelector("#topbar-actions");
+  mountTimer(actions);
+
   return {
     outlet: appRoot.querySelector("#view"),
     setCrumbs: (text) => { appRoot.querySelector("#crumbs").textContent = text; },
-    actions: appRoot.querySelector("#topbar-actions"),
+    actions,
   };
 }
