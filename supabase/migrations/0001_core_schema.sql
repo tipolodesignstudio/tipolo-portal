@@ -27,6 +27,7 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
   before update on public.profiles
   for each row execute function public.set_updated_at();
@@ -57,6 +58,7 @@ create table if not exists public.app_settings (
   constraint app_settings_singleton check (id = 1)
 );
 
+drop trigger if exists app_settings_set_updated_at on public.app_settings;
 create trigger app_settings_set_updated_at
   before update on public.app_settings
   for each row execute function public.set_updated_at();
@@ -82,6 +84,7 @@ create table if not exists public.clients (
 
 create index if not exists clients_status_idx on public.clients (status);
 
+drop trigger if exists clients_set_updated_at on public.clients;
 create trigger clients_set_updated_at
   before update on public.clients
   for each row execute function public.set_updated_at();
@@ -110,6 +113,7 @@ create table if not exists public.projects (
 create index if not exists projects_client_id_idx on public.projects (client_id);
 create index if not exists projects_status_idx    on public.projects (status);
 
+drop trigger if exists projects_set_updated_at on public.projects;
 create trigger projects_set_updated_at
   before update on public.projects
   for each row execute function public.set_updated_at();

@@ -49,6 +49,96 @@ export async function getMyProfile() {
   return data;
 }
 
+/* ---------------- clients ---------------- */
+
+export async function listClients({ search = "", status = "active" } = {}) {
+  let q = supabase
+    .from("clients")
+    .select("*, projects(count)")
+    .order("name", { ascending: true });
+  if (status && status !== "all") q = q.eq("status", status);
+  if (search.trim()) {
+    const s = `%${search.trim()}%`;
+    q = q.or(`name.ilike.${s},company.ilike.${s},email.ilike.${s}`);
+  }
+  const rows = unwrap(await q);
+  return rows.map((r) => ({ ...r, project_count: r.projects?.[0]?.count ?? 0 }));
+}
+
+export async function getClient(id) {
+  return unwrap(await supabase.from("clients").select("*").eq("id", id).single());
+}
+
+export async function createClient(patch) {
+  return unwrap(await supabase.from("clients").insert(patch).select().single());
+}
+
+export async function updateClient(id, patch) {
+  return unwrap(await supabase.from("clients").update(patch).eq("id", id).select().single());
+}
+
+/* ---------------- projects ---------------- */
+
+const PROJECT_SELECT = "*, client:clients(id, name, company, default_rate)";
+
+export async function listProjects({ search = "", status = "", scope = "", clientId = "" } = {}) {
+  let q = supabase.from("projects").select(PROJECT_SELECT).order("updated_at", { ascending: false });
+  if (status && status !== "all") q = q.eq("status", status);
+  if (scope && scope !== "all") q = q.eq("scope", scope);
+  if (clientId) q = q.eq("client_id", clientId);
+  if (search.trim()) {
+    const s = `%${search.trim()}%`;
+    q = q.or(`title.ilike.${s},description.ilike.${s}`);
+  }
+  return unwrap(await q);
+}
+
+export async function getProject(id) {
+  return unwrap(await supabase.from("projects").select(PROJECT_SELECT).eq("id", id).single());
+}
+
+export async function createProject(patch) {
+  return unwrap(await supabase.from("projects").insert(patch).select(PROJECT_SELECT).single());
+}
+
+export async function updateProject(id, patch) {
+  return unwrap(await supabase.from("projects").update(patch).eq("id", id).select(PROJECT_SELECT).single());
+}
+
+/* effective hourly rate: project override -> client default -> settings default */
+export function effectiveRate(project, settings) {
+  return (
+    project?.hourly_rate ??
+    project?.client?.default_rate ??
+    settings?.default_hourly_rate ??
+    null
+  );
+}
+
+/* ---------------- dashboard ---------------- */
+
+export async function getDashboardStats() {
+  const [clientsActive, projects] = await Promise.all([
+    supabase.from("clients").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("projects").select("id, status, title, updated_at, client:clients(name)")
+      .order("updated_at", { ascending: false }),
+  ]);
+  if (clientsActive.error) throw new Error(clientsActive.error.message);
+  if (projects.error) throw new Error(projects.error.message);
+
+  const rows = projects.data || [];
+  const byStatus = {};
+  for (const p of rows) byStatus[p.status] = (byStatus[p.status] || 0) + 1;
+
+  return {
+    activeClients: clientsActive.count ?? 0,
+    activeProjects: byStatus.active || 0,
+    totalProjects: rows.length,
+    byStatus,
+    recent: rows.slice(0, 6),
+  };
+}
+
 /* ---------------- storage (branding logo) ---------------- */
 
 export async function uploadLogo(file) {

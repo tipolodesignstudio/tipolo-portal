@@ -13,20 +13,24 @@ automated. Budget ~30 minutes. After this, day-to-day use is just opening
 3. Set a strong database password (save it in 1Password; you rarely need it).
 4. Wait for the project to finish provisioning (~2 min).
 
-## 2. Run the database migrations
+## 2. Run the database schema
 
-In the project: **SQL Editor** → **+ New query**. Open each file below from
-`supabase/migrations/`, paste its contents, click **Run**. Do them **in order** and
-confirm each says *Success* before the next:
+In the project: **SQL Editor** → **+ New query**. Open **`supabase/schema.sql`**, paste
+the whole thing, click **Run**. It should say *Success*. (It's safe to re-run.)
 
-| # | File | What it does |
-|---|------|--------------|
-| 1 | `0000_extensions.sql` | Enables required Postgres extensions |
-| 2 | `0001_core_schema.sql` | Creates `profiles`, `app_settings`, `clients`, `projects` |
-| 3 | `0002_auth_domain_restriction.sql` | Restricts sign-up to `@tipolo.ca`; mirrors users into `profiles` |
-| 4 | `0003_rls_policies.sql` | Row-level security (any logged-in user = full access) |
-| 5 | `0004_functions.sql` | `next_invoice_number()` helper |
-| 6 | `0005_seed_settings.sql` | Creates the settings row with BC tax lines (GST 5% + PST 7%) |
+That one file bundles all six migrations:
+
+| File | What it does |
+|------|--------------|
+| `0000_extensions.sql` | Enables required Postgres extensions |
+| `0001_core_schema.sql` | Creates `profiles`, `app_settings`, `clients`, `projects` |
+| `0002_auth_domain_restriction.sql` | Restricts sign-up to `@tipolo.ca`; mirrors users into `profiles` |
+| `0003_rls_policies.sql` | Row-level security (any logged-in user = full access) |
+| `0004_functions.sql` | `next_invoice_number()` helper |
+| `0005_seed_settings.sql` | Creates the settings row with BC tax lines (GST 5% + PST 7%) |
+
+*(If you'd rather run them one at a time, the individual files are in
+`supabase/migrations/` — run them in numeric order.)*
 
 ## 3. Configure Auth
 
