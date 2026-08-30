@@ -71,7 +71,11 @@ async function handle() {
       a.classList.toggle("active", target === path || (target !== "/" && path.startsWith(target)));
     });
     window.scrollTo(0, 0);
-    await mod.render(outlet, { params, query, path, navigate });
+    // Render into a fresh frame so any delegated listeners the previous view bound
+    // die with the old node instead of stacking up across navigations.
+    const frame = document.createElement("div");
+    outlet.replaceChildren(frame);
+    await mod.render(frame, { params, query, path, navigate });
   } catch (err) {
     console.error("Route error:", err);
     if (token === currentToken) {

@@ -305,6 +305,7 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .filters .search { min-width: 200px; flex: 1 1 220px; max-width: 320px; }
+.filters select { max-width: 200px; }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .seg button { padding: 7px 12px; background: var(--card-bg); border: none; cursor: pointer; font-size: 0.85rem; color: var(--ink-soft); }
 .seg button + button { border-left: 1px solid var(--border); }
