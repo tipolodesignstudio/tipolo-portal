@@ -75,11 +75,8 @@ export async function updateCategory(id, patch) {
   return unwrap(await supabase.from("client_categories").update(patch).eq("id", id).select().single());
 }
 export async function deleteCategory(id) {
-  // pull it from any client that carries it, then delete
-  const affected = unwrap(await supabase.from("clients").select("id, category_ids").contains("category_ids", [id]));
-  for (const c of affected) {
-    await supabase.from("clients").update({ category_ids: c.category_ids.filter((x) => x !== id) }).eq("id", c.id);
-  }
+  // unset it on any client that uses it, then delete
+  await supabase.from("clients").update({ category_id: null }).eq("category_id", id);
   const { error } = await supabase.from("client_categories").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -87,12 +84,13 @@ export async function deleteCategory(id) {
 /* ---------------- clients ---------------- */
 
 const CLIENT_SELECT =
-  "*, projects(count), contacts:client_contacts(id, name, title, email, phone, is_primary)";
+  "*, projects(count), category:category_id(id, name), " +
+  "contacts:client_contacts(id, name, title, email, phone, is_primary)";
 
 export async function listClients({ search = "", status = "active", categoryId = "" } = {}) {
   let q = supabase.from("clients").select(CLIENT_SELECT).order("name", { ascending: true });
   if (status && status !== "all") q = q.eq("status", status);
-  if (categoryId) q = q.contains("category_ids", [categoryId]);
+  if (categoryId) q = q.eq("category_id", categoryId);
   if (search.trim()) {
     const s = `%${search.trim()}%`;
     q = q.or(`name.ilike.${s},email.ilike.${s}`);
@@ -103,6 +101,26 @@ export async function listClients({ search = "", status = "active", categoryId =
     project_count: r.projects?.[0]?.count ?? 0,
     primary_contact: (r.contacts || []).find((c) => c.is_primary) || (r.contacts || [])[0] || null,
   }));
+}
+
+/* ---------------- client notes (CRM timeline) ---------------- */
+
+export async function listClientNotes(clientId) {
+  return unwrap(await supabase.from("client_notes")
+    .select("*").eq("client_id", clientId).order("created_at", { ascending: false }));
+}
+export async function addClientNote(clientId, body) {
+  return unwrap(await supabase.from("client_notes")
+    .insert({ client_id: clientId, body: body.trim() }).select().single());
+}
+// bulk-commit inline edits from the list: [{ clientId, body }]
+export async function commitClientNotes(changes) {
+  const rows = changes.filter((c) => c.body != null && c.body.trim())
+    .map((c) => ({ client_id: c.clientId, body: c.body.trim() }));
+  if (!rows.length) return 0;
+  const { error } = await supabase.from("client_notes").insert(rows);
+  if (error) throw new Error(error.message);
+  return rows.length;
 }
 
 export async function getClient(id) {

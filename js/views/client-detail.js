@@ -1,19 +1,22 @@
-// Client detail: contact card + this client's projects.
-import { escapeHtml, money, date, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
+// Client detail: contacts, CRM notes timeline, proposals, projects.
+import { escapeHtml, money, date, relTime, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getClient, listProjects, listProposals, listCategories } from "../core/api.js";
+import {
+  getClient, listProjects, listProposals, listClientNotes, addClientNote,
+} from "../core/api.js";
 import { editClient } from "./clients.js";
 import { newProposalFlow } from "./proposals.js";
+import { toastOk, toastErr } from "../components/toast.js";
 
 export async function render(root, ctx) {
   const id = ctx.params.id;
   root.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading…</div>`;
 
-  let client, projects, proposals, categories;
+  let client, projects, proposals, notes;
   try {
-    [client, projects, proposals, categories] = await Promise.all([
+    [client, projects, proposals, notes] = await Promise.all([
       getClient(id), listProjects({ clientId: id }), listProposals({ clientId: id }),
-      listCategories().catch(() => []),
+      listClientNotes(id).catch(() => []),
     ]);
   } catch (err) {
     root.innerHTML = `<div class="empty"><h3>Client not found</h3>
@@ -22,7 +25,6 @@ export async function render(root, ctx) {
     return;
   }
   ctx.setCrumbs?.(`Clients / ${client.name}`);
-  const catById = Object.fromEntries((categories || []).map((c) => [c.id, c.name]));
   const contacts = (client.contacts || []).slice().sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
 
   root.innerHTML = `
@@ -33,13 +35,22 @@ export async function render(root, ctx) {
           ${client.status === "archived" ? `<span class="badge grey">archived</span>` : ""}</h1>
         <div class="muted">
           ${client.is_individual ? "Individual client" : escapeHtml(client.primary_contact?.name || "")}
-          ${(client.category_ids || []).map((id) => `<span class="badge" style="margin-left:6px">${escapeHtml(catById[id] || "?")}</span>`).join("")}
+          ${client.category ? `<span class="badge" style="margin-left:6px">${escapeHtml(client.category.name)}</span>` : ""}
         </div>
       </div>
       <div class="cluster">
         <button class="btn ghost" data-edit-client>Edit client</button>
         <button class="btn" data-new-proposal>+ New proposal</button>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Notes history</h2>
+      <form id="add-note" class="stack" style="gap:8px;margin-bottom:14px">
+        <textarea name="body" rows="2" placeholder="Add a dated note…"></textarea>
+        <div><button class="btn sm" type="submit">Add note</button></div>
+      </form>
+      <div id="note-timeline"></div>
     </div>
 
     <div class="card">
@@ -65,7 +76,6 @@ export async function render(root, ctx) {
         <dt>Address</dt><dd style="white-space:pre-wrap">${escapeHtml(addressBlock(client)) || "—"}</dd>
         <dt>Default rate</dt><dd>${client.default_rate != null ? money(client.default_rate) + " / hr" : "—"}</dd>
         <dt>Tags</dt><dd>${(client.tags || []).map((t) => `<span class="badge">${escapeHtml(t)}</span>`).join(" ") || "—"}</dd>
-        <dt>Notes</dt><dd style="white-space:pre-wrap">${escapeHtml(client.notes || "—")}</dd>
       </dl>
     </div>
 
@@ -84,6 +94,32 @@ export async function render(root, ctx) {
   on(root, "click", "[data-new-proposal]", () => newProposalFlow(ctx, client.id));
   on(root, "click", "tr[data-pid]", (e, tr) => ctx.navigate(`/projects/${tr.dataset.pid}`));
   on(root, "click", "tr[data-prop]", (e, tr) => ctx.navigate(`/proposals/${tr.dataset.prop}`));
+
+  const timeline = root.querySelector("#note-timeline");
+  const renderNotes = (list) => {
+    timeline.innerHTML = list.length ? list.map((n, i) => `
+      <div class="note-entry${i > 0 ? " archived" : ""}">
+        <div class="faint" style="font-size:.78rem">${date(n.created_at)} · ${relTime(n.created_at)}${i === 0 ? "" : " · archived"}</div>
+        <div style="white-space:pre-wrap">${escapeHtml(n.body)}</div>
+      </div>`).join("")
+      : `<p class="faint" style="font-size:.9rem">No notes yet.</p>`;
+  };
+  renderNotes(notes);
+
+  root.querySelector("#add-note").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const ta = e.target.elements.body;
+    const body = ta.value.trim();
+    if (!body) return;
+    e.target.querySelector("button").disabled = true;
+    try {
+      await addClientNote(client.id, body);
+      ta.value = "";
+      renderNotes(await listClientNotes(client.id));
+      toastOk("Note added");
+    } catch (err) { toastErr(err.message); }
+    finally { e.target.querySelector("button").disabled = false; }
+  });
 }
 
 function proposalList(proposals) {

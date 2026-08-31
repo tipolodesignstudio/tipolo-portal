@@ -473,3 +473,16 @@ dialog.modal .m-foot { display: flex; justify-content: flex-end; gap: 10px; padd
   background: var(--bg-alt);
 }
 .contact-row input { background: var(--card-bg); }
+
+/* ---------- clients CRM table + notes timeline ---------- */
+table.data.crm td { vertical-align: top; }
+table.data.crm textarea {
+  width: 100%; min-height: 44px; padding: 6px 8px; font-size: 0.88rem;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  resize: vertical;
+}
+table.data.crm textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .14); }
+.note-entry { padding: 10px 0; border-bottom: 1px solid var(--border-soft); }
+.note-entry:last-child { border-bottom: none; }
+.note-entry.archived { opacity: 0.72; }
+.note-entry.archived > div:last-child { font-size: 0.92rem; }

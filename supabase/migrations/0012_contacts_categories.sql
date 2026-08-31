@@ -14,7 +14,8 @@ insert into public.client_categories (name, sort_order) values
   ('Architect', 4), ('Designer', 5), ('Municipality', 6), ('Other', 99)
 on conflict (name) do nothing;
 
-alter table public.clients add column if not exists category_ids uuid[] not null default '{}';
+-- (single category_id lives on clients from 0001 / 0013; earlier revisions of this
+--  migration added a category_ids[] array here — 0013 collapses it if present)
 
 -- ---- client contacts ----
 create table if not exists public.client_contacts (

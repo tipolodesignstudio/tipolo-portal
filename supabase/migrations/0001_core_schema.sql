@@ -66,23 +66,24 @@ create trigger app_settings_set_updated_at
 -- clients
 -- ---------------------------------------------------------------------------
 create table if not exists public.clients (
-  id            uuid primary key default gen_random_uuid(),
-  name          text not null,                    -- client / business name (primary identity)
-  is_individual boolean not null default false,   -- true => single contact = the person
-  category_ids  uuid[] not null default '{}',     -- -> client_categories
-  email         text,
-  phone         text,
-  street        text,
-  city          text,
-  province      text,
-  postal_code   text,
-  notes         text,
-  default_rate  numeric(10,2),
-  tags          text[] not null default '{}',
-  status        text not null default 'active',   -- 'active' | 'archived'
-  created_by    uuid references auth.users(id) default auth.uid(),
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  id             uuid primary key default gen_random_uuid(),
+  name           text not null,                   -- client / business name (primary identity)
+  is_individual  boolean not null default false,  -- true => single contact = the person
+  category_id    uuid,                            -- -> client_categories (FK added in 0012/0013)
+  email          text,
+  phone          text,
+  street         text,
+  city           text,
+  province       text,
+  postal_code    text,
+  latest_note    text,                            -- denormalised newest client_notes entry
+  latest_note_at timestamptz,
+  default_rate   numeric(10,2),
+  tags           text[] not null default '{}',
+  status         text not null default 'active',  -- 'active' | 'archived'
+  created_by     uuid references auth.users(id) default auth.uid(),
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
 );
 
 create index if not exists clients_status_idx on public.clients (status);
