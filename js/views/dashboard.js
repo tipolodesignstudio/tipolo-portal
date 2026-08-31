@@ -41,8 +41,13 @@ export async function render(root, ctx) {
       <a class="stat" href="#/timesheets" style="text-decoration:none">
         <div class="k">Unbilled hours</div>
         <div class="v">${minutesToHours(stats.unbilled?.minutesAll || 0, 1)}</div>
-        <div class="d">${money(stats.unbilled?.valueAll || 0)} · ${money(stats.unbilled?.valueMonth || 0)} this month</div></a>
-      <div class="stat"><div class="k">Outstanding</div><div class="v faint">—</div><div class="d">Phase 3</div></div>
+        <div class="d">${money(stats.unbilled?.valueAll || 0)} unbilled value</div></a>
+      <a class="stat" href="#/invoices?status=sent" style="text-decoration:none">
+        <div class="k">Outstanding</div>
+        <div class="v">${money(stats.invoices?.outstanding || 0)}</div>
+        <div class="d">${stats.invoices?.overdueCount
+          ? `<span style="color:var(--error-ink)">${stats.invoices.overdueCount} overdue</span> · `
+          : ""}${money(stats.invoices?.paidThisMonth || 0)} paid this month</div></a>
     </div>
 
     ${setupNeeds.length ? `

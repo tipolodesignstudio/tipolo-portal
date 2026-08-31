@@ -49,9 +49,8 @@ create table if not exists public.app_settings (
                           {"label":"PST","rate":7,"enabled":true}]'::jsonb,
   currency            text not null default 'CAD',
   default_hourly_rate numeric(10,2),
-  invoice_prefix      text not null default 'TIP',
-  invoice_year_reset  boolean not null default true,
-  invoice_next_seq    int not null default 1,
+  job_seq_year        smallint not null default extract(year from now())::smallint,
+  job_seq_next        int not null default 1,
   payment_terms       text,
   proposal_terms      text,
   updated_at          timestamptz not null default now(),
@@ -98,6 +97,8 @@ create trigger clients_set_updated_at
 -- ---------------------------------------------------------------------------
 create table if not exists public.projects (
   id           uuid primary key default gen_random_uuid(),
+  number       text unique,                     -- job number YYNNN (trigger-assigned)
+  next_invoice_seq int not null default 1,      -- per-project invoice counter
   client_id    uuid not null references public.clients(id) on delete restrict,
   title        text not null,
   description  text,

@@ -2,14 +2,10 @@
 -- Creates the single app_settings row. Tax lines pre-seeded for British Columbia
 -- (5% GST + 7% PST). Business fields are left blank for Jim to fill in Settings.
 
-insert into public.app_settings (id, currency, invoice_prefix, invoice_year_reset,
-                                 invoice_next_seq, tax_lines, payment_terms, proposal_terms)
+insert into public.app_settings (id, currency, tax_lines, payment_terms, proposal_terms)
 values (
   1,
   'CAD',
-  'TIP',
-  true,
-  1,
   '[{"label":"GST","rate":5,"enabled":true},
     {"label":"PST","rate":7,"enabled":true}]'::jsonb,
   'Payment due within 30 days of the invoice date. Please make cheques payable to '

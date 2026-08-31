@@ -2,9 +2,10 @@
 // fill in during later phases).
 import { escapeHtml, money, date, minutesToHM, minutesToHours, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getProject, updateProject, getSettings, effectiveRate, listProjectTime } from "../core/api.js";
+import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices } from "../core/api.js";
 import { editProject } from "./projects.js";
 import { editTimeEntry, confirmDeleteEntry } from "./time-entry-modal.js";
+import { newInvoiceFlow, effectiveStatus } from "./invoices.js";
 import { toastErr } from "../components/toast.js";
 
 export async function render(root, ctx) {
@@ -33,7 +34,7 @@ export async function render(root, ctx) {
           <a href="#/projects">← Projects</a> ·
           <a href="#/clients/${p.client?.id}">${escapeHtml(p.client?.name || "client")}</a>
         </div>
-        <h1>${escapeHtml(p.title)}
+        <h1>${p.number ? `<span class="faint">${escapeHtml(p.number)}</span> ` : ""}${escapeHtml(p.title)}
           <span class="badge ${STATUS_TONE[p.status] || "grey"}">${STATUS_LABELS[p.status] || p.status}</span></h1>
       </div>
       <button class="btn ghost" data-edit>Edit project</button>
@@ -111,10 +112,11 @@ export async function render(root, ctx) {
     });
   } else if (tab === "time") {
     await renderTimeTab(pane, p, ctx);
+  } else if (tab === "invoices") {
+    await renderInvoicesTab(pane, p, ctx);
   } else {
-    const phase = { invoices: "Phase 3", proposals: "Phase 4" }[tab];
-    pane.innerHTML = `<div class="empty"><h3>${tab[0].toUpperCase() + tab.slice(1)}</h3>
-      <p class="faint">Arrives in ${phase}.</p></div>`;
+    pane.innerHTML = `<div class="empty"><h3>Proposals</h3>
+      <p class="faint">Arrives in Phase 4.</p></div>`;
   }
 
   on(root, "click", "[data-edit]", () => editProject({ id }, () => ctx.navigate(ctx.path)));
@@ -172,4 +174,36 @@ async function renderTimeTab(pane, project, ctx) {
     if (ex) editTimeEntry({ existing: ex, onSaved: reload });
   });
   on(pane, "click", "[data-del-te]", (e, el) => confirmDeleteEntry(el.dataset.delTe, reload));
+}
+
+async function renderInvoicesTab(pane, project, ctx) {
+  pane.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading invoices…</div>`;
+  let invoices;
+  try { invoices = await listProjectInvoices(project.id); }
+  catch (err) { pane.innerHTML = `<div class="empty"><p class="faint">${escapeHtml(err.message)}</p></div>`; return; }
+
+  const TONE = { draft: "grey", sent: "amber", paid: "green", overdue: "red" };
+  pane.innerHTML = `
+    <div class="between" style="margin-bottom:10px">
+      <h2 class="mt-0">Invoices</h2>
+      <button class="btn sm" data-new-inv>+ New invoice</button>
+    </div>
+    ${invoices.length ? `
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Number</th><th>Issued</th><th class="num">Total</th><th>Status</th></tr></thead>
+        <tbody>
+          ${invoices.map((inv) => {
+            const st = effectiveStatus(inv);
+            return `<tr class="clickable" data-inv="${inv.id}">
+              <td>${escapeHtml(inv.number || "— draft")}</td>
+              <td class="muted nowrap">${inv.issue_date ? date(inv.issue_date) : "—"}</td>
+              <td class="num">${money(inv.total)}</td>
+              <td><span class="badge ${TONE[st]}">${st[0].toUpperCase() + st.slice(1)}</span></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table></div>` : `<div class="empty"><p class="faint">No invoices reference this project yet.</p></div>`}`;
+
+  on(pane, "click", "[data-new-inv]", () => newInvoiceFlow(ctx, project.id));
+  on(pane, "click", "[data-inv]", (e, el) => ctx.navigate(`/invoices/${el.dataset.inv}`));
 }

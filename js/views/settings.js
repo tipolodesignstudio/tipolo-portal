@@ -67,20 +67,20 @@ export async function render(root, ctx) {
       </div>
 
       <div class="card">
-        <h2>Invoicing</h2>
+        <h2>Numbering</h2>
+        <div class="muted" style="margin-bottom:10px">
+          Jobs are numbered <code>YYNNN</code> (e.g. <code>${String(new Date().getFullYear()).slice(2)}001</code>) —
+          a proposal or project draws the next number, and a converted proposal keeps its
+          number as the project number. The sequence resets each January.
+          Invoices are <code>YYNNN-XX</code> — the project number plus a per-project
+          count starting at <code>01</code>.
+        </div>
         <div class="form-grid cols-2">
           ${number("default_hourly_rate", "Default hourly rate", s.default_hourly_rate, "0.01")}
-          ${text("invoice_prefix", "Invoice number prefix", s.invoice_prefix || "TIP")}
-          ${number("invoice_next_seq", "Next invoice number", s.invoice_next_seq ?? 1, "1")}
-          <div class="field">
-            <label class="lbl">Number format</label>
-            <label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
-              <input type="checkbox" name="invoice_year_reset" ${s.invoice_year_reset ? "checked" : ""}
-                     style="width:auto" />
-              Include year &amp; reset each January (PREFIX-YYYY-0001)
-            </label>
-          </div>
+          ${number("job_seq_year", "Sequence year", s.job_seq_year ?? new Date().getFullYear(), "1")}
+          ${number("job_seq_next", "Next job number", s.job_seq_next ?? 1, "1")}
         </div>
+        <div class="hint">Adjust "Next job number" only to line the portal up with numbers you've already issued elsewhere.</div>
       </div>
 
       <div class="card">
@@ -146,9 +146,8 @@ export async function render(root, ctx) {
       pst_number: fd.get("pst_number") || null,
       logo_url: fd.get("logo_url") || null,
       default_hourly_rate: fd.get("default_hourly_rate") ? Number(fd.get("default_hourly_rate")) : null,
-      invoice_prefix: (fd.get("invoice_prefix") || "TIP").trim(),
-      invoice_next_seq: Math.max(1, Number(fd.get("invoice_next_seq")) || 1),
-      invoice_year_reset: fd.get("invoice_year_reset") === "on",
+      job_seq_year: Math.max(2000, Number(fd.get("job_seq_year")) || new Date().getFullYear()),
+      job_seq_next: Math.max(1, Number(fd.get("job_seq_next")) || 1),
       payment_terms: fd.get("payment_terms") || null,
       proposal_terms: fd.get("proposal_terms") || null,
       tax_lines: taxLines

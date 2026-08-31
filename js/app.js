@@ -16,7 +16,8 @@ const ROUTES = [
   { pattern: "/projects",    load: () => import("./views/projects.js") },
   { pattern: "/projects/:id",load: () => import("./views/project-detail.js") },
   { pattern: "/timesheets",  load: () => import("./views/timesheets.js") },
-  { pattern: "/invoices",    load: () => import("./views/soon.js") },
+  { pattern: "/invoices",     load: () => import("./views/invoices.js") },
+  { pattern: "/invoices/:id", load: () => import("./views/invoice-detail.js") },
   { pattern: "/proposals",   load: () => import("./views/soon.js") },
   { pattern: "*",            load: () => import("./views/soon.js") },
 ];

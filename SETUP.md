@@ -26,11 +26,13 @@ That one file bundles every migration:
 | `0001_core_schema.sql` | Creates `profiles`, `app_settings`, `clients`, `projects` |
 | `0002_auth_domain_restriction.sql` | Restricts sign-up to `@tipolo.ca`; mirrors users into `profiles` |
 | `0003_rls_policies.sql` | Row-level security (any logged-in user = full access) |
-| `0004_functions.sql` | `next_invoice_number()` helper |
+| `0004_functions.sql` | (no-op — numbering moved to `0009`) |
 | `0005_seed_settings.sql` | Creates the settings row with BC tax lines (GST 5% + PST 7%) |
 | `0006_time_entries.sql` | Timesheet entries table (Phase 2) |
 | `0007_clients_contact.sql` | Client = business name; adds `contact_name` + `is_individual` |
 | `0008_client_address.sql` | Structured address: street / city / province / postal_code |
+| `0009_numbering.sql` | Job numbers `YYNNN` on projects; `next_job_number()` / `next_invoice_number()` |
+| `0010_invoices.sql` | Invoices table (Phase 3) — one invoice per project, number `YYNNN-XX` |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,

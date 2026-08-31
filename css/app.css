@@ -441,3 +441,14 @@ dialog.modal .m-foot { display: flex; justify-content: flex-end; gap: 10px; padd
 .te-acts { grid-column: 1 / -1; display: flex; gap: 10px; }
 .te-acts .btn.link { font-size: 0.78rem; }
 .week-totals { margin-top: 14px; }
+
+/* ---------- invoice editor totals ---------- */
+.totals-box { display: flex; justify-content: flex-end; margin-top: 14px; }
+.totals-box .totals { width: min(320px, 100%); font-size: 0.92rem; }
+.totals-box .totals .row { display: flex; justify-content: space-between; padding: 4px 2px; }
+.totals-box .totals .row.grand {
+  border-top: 1.5px solid var(--accent); font-family: var(--font-heading);
+  font-weight: 500; font-size: 1.05rem; margin-top: 4px; padding-top: 8px;
+}
+#lines input { padding: 6px 8px; }
+#lines td { vertical-align: middle; }

@@ -1,5 +1,14 @@
 // Data-access layer. Views call these helpers; they never touch `supabase` directly.
 import { supabase } from "./supabase.js";
+import { isoDate } from "./format.js";
+
+const isoToday = () => isoDate();
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+function addDaysIso(iso, days) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return isoDate(d);
+}
 
 function unwrap({ data, error }) {
   if (error) {
@@ -27,8 +36,9 @@ export async function saveSettings(patch) {
 
 function defaultSettings() {
   return {
-    id: 1, currency: "CAD", invoice_prefix: "TIP", invoice_year_reset: true,
-    invoice_next_seq: 1, tax_lines: [
+    id: 1, currency: "CAD",
+    job_seq_year: new Date().getFullYear(), job_seq_next: 1,
+    tax_lines: [
       { label: "GST", rate: 5, enabled: true },
       { label: "PST", rate: 7, enabled: true },
     ],
@@ -151,6 +161,25 @@ export async function getDashboardStats() {
     }
   } catch { /* time_entries table may not exist yet */ }
 
+  // invoice figures (Phase 3)
+  let invoices = { outstanding: 0, overdueCount: 0, paidThisMonth: 0 };
+  try {
+    const inv = await supabase.from("invoices").select("total, status, due_date, paid_date");
+    if (!inv.error) {
+      const today = isoToday();
+      const ms = today.slice(0, 8) + "01";
+      for (const i of inv.data || []) {
+        if (i.status === "sent") {
+          invoices.outstanding += Number(i.total || 0);
+          if (i.due_date && i.due_date < today) invoices.overdueCount += 1;
+        }
+        if (i.status === "paid" && i.paid_date && i.paid_date >= ms) {
+          invoices.paidThisMonth += Number(i.total || 0);
+        }
+      }
+    }
+  } catch { /* invoices table may not exist yet */ }
+
   return {
     activeClients: clientsActive.count ?? 0,
     activeProjects: byStatus.active || 0,
@@ -158,6 +187,7 @@ export async function getDashboardStats() {
     byStatus,
     recent: rows.slice(0, 6),
     unbilled,
+    invoices,
   };
 }
 
@@ -204,6 +234,120 @@ export async function listActiveProjectsLite() {
       .select("id, title, scope, hourly_rate, client:clients(id, name, default_rate)")
       .not("status", "in", "(archived,complete)")
       .order("title")
+  );
+}
+
+/* ---------------- invoices ---------------- */
+// One invoice = one project. Client is reached through the project.
+
+const INVOICE_SELECT =
+  "*, project:projects(id, number, title, scope, " +
+  "client:clients(id, name, contact_name, is_individual, email, street, city, province, postal_code))";
+
+export async function listInvoices({ status = "", projectId = "" } = {}) {
+  let q = supabase.from("invoices").select(INVOICE_SELECT).order("issue_date", { ascending: false });
+  if (status && status !== "all") {
+    if (status === "overdue") q = q.eq("status", "sent").lt("due_date", isoToday());
+    else q = q.eq("status", status);
+  }
+  if (projectId) q = q.eq("project_id", projectId);
+  return unwrap(await q);
+}
+
+export async function getInvoice(id) {
+  return unwrap(await supabase.from("invoices").select(INVOICE_SELECT).eq("id", id).single());
+}
+
+export async function listProjectInvoices(projectId) {
+  return unwrap(
+    await supabase.from("invoices").select(INVOICE_SELECT)
+      .eq("project_id", projectId).order("issue_date", { ascending: false })
+  );
+}
+
+export async function createInvoice(patch) {
+  return unwrap(await supabase.from("invoices").insert(patch).select(INVOICE_SELECT).single());
+}
+
+export async function updateInvoice(id, patch) {
+  return unwrap(await supabase.from("invoices").update(patch).eq("id", id).select(INVOICE_SELECT).single());
+}
+
+// Finalize a draft: assign the next number (YYNNN-XX), link its time entries, set status.
+export async function finalizeInvoice(inv) {
+  const { data: number, error: numErr } =
+    await supabase.rpc("next_invoice_number", { p_project_id: inv.project_id });
+  if (numErr) throw new Error(numErr.message);
+
+  const teIds = (inv.line_items || []).flatMap((li) => li.source_time_entry_ids || []);
+  if (teIds.length) {
+    const { error } = await supabase.from("time_entries")
+      .update({ invoice_id: inv.id }).in("id", teIds);
+    if (error) throw new Error(error.message);
+  }
+  return updateInvoice(inv.id, {
+    number, status: "sent", sent_date: isoToday(),
+    due_date: inv.due_date || addDaysIso(isoToday(), 30),
+  });
+}
+
+export async function markInvoicePaid(id, { paid_date, payment_method }) {
+  return updateInvoice(id, {
+    status: "paid",
+    paid_date: paid_date || isoToday(),
+    payment_method: payment_method || null,
+  });
+}
+
+export async function reopenInvoice(id) {
+  return updateInvoice(id, { status: "sent", paid_date: null });
+}
+
+// Delete an invoice; time entries are released automatically by the FK (on delete set null).
+export async function deleteInvoice(id) {
+  const { error } = await supabase.from("invoices").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// Unbilled billable time for ONE project, grouped into draft line items by rate.
+export async function buildTimeLineItems(projectId) {
+  const proj = unwrap(
+    await supabase.from("projects").select("id, title").eq("id", projectId).single()
+  );
+  const entries = unwrap(
+    await supabase.from("time_entries")
+      .select("id, minutes, rate")
+      .eq("project_id", projectId)
+      .is("invoice_id", null)
+      .eq("billable", true)
+  );
+
+  const groups = new Map(); // key: rate
+  for (const e of entries) {
+    const rate = Number(e.rate || 0);
+    if (!groups.has(rate)) groups.set(rate, { rate, minutes: 0, ids: [] });
+    const g = groups.get(rate);
+    g.minutes += e.minutes;
+    g.ids.push(e.id);
+  }
+
+  const lineItems = [...groups.values()].map((g) => ({
+    description: `${proj.title} — professional services`,
+    qty: round2(g.minutes / 60),
+    unit_price: round2(g.rate),
+    kind: "time",
+    source_time_entry_ids: g.ids,
+  }));
+
+  return { lineItems, entryCount: entries.length };
+}
+
+// projects for the invoice picker: "YYNNN · Title — Client"
+export async function listProjectsForInvoicing() {
+  return unwrap(
+    await supabase.from("projects")
+      .select("id, number, title, status, client:clients(name)")
+      .order("number", { ascending: false })
   );
 }
 

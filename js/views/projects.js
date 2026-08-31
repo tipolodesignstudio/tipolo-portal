@@ -57,10 +57,11 @@ function table(rows) {
   return `
     <div class="table-wrap">
       <table class="data">
-        <thead><tr><th>Title</th><th>Client</th><th>Scope</th><th>Status</th><th>Due</th><th class="num">Budget</th></tr></thead>
+        <thead><tr><th>No.</th><th>Title</th><th>Client</th><th>Scope</th><th>Status</th><th>Due</th><th class="num">Budget</th></tr></thead>
         <tbody>
           ${rows.map((p) => `
             <tr class="clickable" data-id="${p.id}">
+              <td class="muted nowrap">${escapeHtml(p.number || "—")}</td>
               <td>${escapeHtml(p.title)}</td>
               <td class="muted">${escapeHtml(p.client?.name || "—")}</td>
               <td class="muted">${escapeHtml(p.scope)}</td>
