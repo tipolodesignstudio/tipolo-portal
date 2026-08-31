@@ -108,19 +108,35 @@ label.lbl {
   color: var(--ink-soft);
   margin-bottom: 5px;
 }
-.input, input[type=text], input[type=email], input[type=password], input[type=number],
-input[type=date], select, textarea {
+.input,
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]):not([type=submit]):not([type=button]),
+select, textarea {
   width: 100%;
   padding: 9px 11px;
   background: var(--bg);
+  color: var(--ink);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   outline: none;
+  font: inherit;
   transition: border-color .12s, box-shadow .12s;
+}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]),
+textarea {
+  -webkit-appearance: none;
+  appearance: none;
 }
 .input:focus, input:focus, select:focus, textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
+}
+/* keep autofilled fields on the form's cream background instead of the UA's white/blue */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset;
+  caret-color: var(--ink);
 }
 textarea { min-height: 88px; resize: vertical; }
 .hint { font-size: 0.78rem; color: var(--ink-faint); margin-top: 4px; }
