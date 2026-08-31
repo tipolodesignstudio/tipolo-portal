@@ -38,7 +38,7 @@ export async function render(root, ctx) {
     <div class="card">
       <h2>Contact</h2>
       <dl class="kv">
-        ${client.is_individual ? "" : `<dt>Contact</dt><dd>${escapeHtml(client.contact_name || "—")}</dd>`}
+        ${client.is_individual ? "" : `<dt>Contact person</dt><dd>${escapeHtml(client.contact_name || "—")}</dd>`}
         <dt>Email</dt><dd>${client.email ? `<a href="mailto:${escapeHtml(client.email)}">${escapeHtml(client.email)}</a>` : "—"}</dd>
         <dt>Phone</dt><dd>${escapeHtml(client.phone || "—")}</dd>
         <dt>Address</dt><dd style="white-space:pre-wrap">${escapeHtml(addressBlock(client)) || "—"}</dd>
