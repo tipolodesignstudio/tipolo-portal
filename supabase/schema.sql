@@ -694,8 +694,17 @@ create policy client_contacts_all on public.client_contacts
 -- each edit is a new entry, older entries are the client's history/archive.
 
 -- ---- single category ----
-alter table public.clients add column if not exists category_id uuid
-  references public.client_categories(id) on delete set null;
+alter table public.clients add column if not exists category_id uuid;
+
+-- ensure the FK exists (the column may have been created without it in 0001)
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'clients_category_id_fkey') then
+    alter table public.clients
+      add constraint clients_category_id_fkey
+      foreign key (category_id) references public.client_categories(id) on delete set null;
+  end if;
+end $$;
 
 do $$
 begin
