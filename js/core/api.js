@@ -564,10 +564,20 @@ export async function buildExpenseLineItems(projectId) {
 // Returns the storage PATH (not a URL). receipts is a private bucket — call
 // receiptUrl(path) to get a short-lived signed URL when you need to open one.
 export async function uploadReceipt(file) {
+  // make sure the access token is fresh before hitting storage (RLS needs it)
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Your session has expired — sign out and back in, then retry.");
+
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const path = `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from("receipts").upload(path, file, { upsert: false });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/row-level security|Unauthorized|AccessDenied/i.test(error.message)) {
+      throw new Error("Storage denied the upload. Check the `receipts` bucket exists and " +
+        "0015_storage_policies.sql has run; if it has, sign out and back in.");
+    }
+    throw new Error(error.message);
+  }
   return path;
 }
 
