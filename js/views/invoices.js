@@ -120,17 +120,24 @@ export async function newInvoiceFlow(ctx, presetProjectId = "") {
         })), { required: true })}
       <label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
         <input type="checkbox" name="pull_time" checked style="width:auto" />
-        Pull this project's unbilled billable time into line items
+        Pull unbilled billable time into line items
+      </label>
+      <label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
+        <input type="checkbox" name="pull_expenses" checked style="width:auto" />
+        Pull unbilled billable expenses (with markup) into line items
       </label>
       ${field("issue_date", "Issue date", isoDate(), { type: "date", required: true })}
     </form>`,
     onConfirm: async (dlg) => {
       const f = new FormData(dlg.querySelector("form"));
       const projectId = f.get("project_id");
-      const pull = f.get("pull_time") === "on";
 
       let lineItems = [];
-      if (pull) lineItems = (await buildTimeLineItems(projectId)).lineItems;
+      if (f.get("pull_time") === "on") lineItems.push(...(await buildTimeLineItems(projectId)).lineItems);
+      if (f.get("pull_expenses") === "on") {
+        const { buildExpenseLineItems } = await import("../core/api.js");
+        lineItems.push(...(await buildExpenseLineItems(projectId)).lineItems);
+      }
 
       const totals = computeTotals(lineItems, settings.tax_lines || []);
       return await createInvoice({

@@ -273,6 +273,21 @@ export async function getDashboardStats() {
     if (!pr.error) openProposals = pr.count ?? 0;
   } catch { /* proposals table may not exist yet */ }
 
+  // expenses (Phase 5)
+  let expenses = { unbilled: 0, spentMonth: 0 };
+  try {
+    const ms = isoToday().slice(0, 8) + "01";
+    const ex = await supabase.from("expenses").select("amount, markup_pct, expense_date, billable, invoice_id");
+    if (!ex.error) {
+      for (const e of ex.data || []) {
+        if (e.expense_date >= ms) expenses.spentMonth += Number(e.amount || 0);
+        if (e.billable && !e.invoice_id) {
+          expenses.unbilled += Number(e.amount || 0) * (1 + (Number(e.markup_pct) || 0) / 100);
+        }
+      }
+    }
+  } catch { /* expenses table may not exist yet */ }
+
   // invoice figures (Phase 3)
   let invoices = { outstanding: 0, overdueCount: 0, paidThisMonth: 0 };
   try {
@@ -301,6 +316,7 @@ export async function getDashboardStats() {
     unbilled,
     invoices,
     openProposals,
+    expenses,
   };
 }
 
@@ -399,6 +415,12 @@ export async function finalizeInvoice(inv) {
       .update({ invoice_id: inv.id }).in("id", teIds);
     if (error) throw new Error(error.message);
   }
+  const exIds = (inv.line_items || []).flatMap((li) => li.source_expense_ids || []);
+  if (exIds.length) {
+    const { error } = await supabase.from("expenses")
+      .update({ invoice_id: inv.id }).in("id", exIds);
+    if (error) throw new Error(error.message);
+  }
   return updateInvoice(inv.id, {
     number, status: "sent", sent_date: isoToday(),
     due_date: inv.due_date || addDaysIso(isoToday(), 30),
@@ -463,6 +485,89 @@ export async function listProjectsForInvoicing() {
       .select("id, number, title, status, client:clients(name)")
       .order("number", { ascending: false })
   );
+}
+
+/* ---------------- expense categories ---------------- */
+
+export async function listExpenseCategories() {
+  return unwrap(await supabase.from("expense_categories").select("*")
+    .order("sort_order").order("name"));
+}
+export async function createExpenseCategory(name) {
+  const { data: max } = await supabase.from("expense_categories")
+    .select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
+  return unwrap(await supabase.from("expense_categories")
+    .insert({ name: name.trim(), sort_order: (max?.sort_order ?? 0) + 1 }).select().single());
+}
+export async function updateExpenseCategory(id, patch) {
+  return unwrap(await supabase.from("expense_categories").update(patch).eq("id", id).select().single());
+}
+export async function deleteExpenseCategory(id) {
+  await supabase.from("expenses").update({ category_id: null }).eq("category_id", id);
+  const { error } = await supabase.from("expense_categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/* ---------------- expenses ---------------- */
+
+const EXPENSE_SELECT =
+  "*, category:category_id(id, name), project:project_id(id, number, title)";
+
+export async function listExpenses({ from, to, projectId = "", categoryId = "",
+                                     billable = "", billed = "" } = {}) {
+  let q = supabase.from("expenses").select(EXPENSE_SELECT).order("expense_date", { ascending: false });
+  if (from) q = q.gte("expense_date", from);
+  if (to) q = q.lte("expense_date", to);
+  if (projectId) q = q.eq("project_id", projectId);
+  if (categoryId) q = q.eq("category_id", categoryId);
+  if (billable === "yes") q = q.eq("billable", true);
+  if (billable === "no") q = q.eq("billable", false);
+  if (billed === "unbilled") q = q.is("invoice_id", null);
+  if (billed === "billed") q = q.not("invoice_id", "is", null);
+  return unwrap(await q);
+}
+
+export async function listProjectExpenses(projectId) {
+  return unwrap(await supabase.from("expenses").select(EXPENSE_SELECT)
+    .eq("project_id", projectId).order("expense_date", { ascending: false }));
+}
+
+export async function createExpense(patch) {
+  return unwrap(await supabase.from("expenses").insert(patch).select(EXPENSE_SELECT).single());
+}
+export async function updateExpense(id, patch) {
+  return unwrap(await supabase.from("expenses").update(patch).eq("id", id).select(EXPENSE_SELECT).single());
+}
+export async function deleteExpense(id) {
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// unbilled billable expenses for ONE project -> invoice line items (amount + markup)
+export async function buildExpenseLineItems(projectId) {
+  const rows = unwrap(await supabase.from("expenses")
+    .select("id, vendor, notes, amount, markup_pct, category:category_id(name)")
+    .eq("project_id", projectId).eq("billable", true).is("invoice_id", null));
+  return {
+    lineItems: rows.map((e) => {
+      const unit = round2(Number(e.amount || 0) * (1 + (Number(e.markup_pct) || 0) / 100));
+      const label = [e.vendor, e.category?.name].filter(Boolean).join(" · ") || e.notes || "Expense";
+      return {
+        description: `${label}${e.markup_pct ? ` (+${e.markup_pct}%)` : ""}`,
+        qty: 1, unit_price: unit, kind: "expense", source_expense_ids: [e.id],
+      };
+    }),
+    count: rows.length,
+  };
+}
+
+export async function uploadReceipt(file) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from("receipts").upload(path, file, { upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from("receipts").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 /* ---------------- proposal templates ---------------- */

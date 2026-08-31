@@ -51,6 +51,10 @@ export async function render(root, ctx) {
         <div class="d">${stats.invoices?.overdueCount
           ? `<span style="color:var(--error-ink)">${stats.invoices.overdueCount} overdue</span> · `
           : ""}${money(stats.invoices?.paidThisMonth || 0)} paid this month</div></a>
+      <a class="stat" href="#/expenses" style="text-decoration:none">
+        <div class="k">Expenses this month</div>
+        <div class="v">${money(stats.expenses?.spentMonth || 0)}</div>
+        <div class="d">${money(stats.expenses?.unbilled || 0)} billable, unbilled</div></a>
     </div>
 
     ${setupNeeds.length ? `

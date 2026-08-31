@@ -9,6 +9,7 @@ const NAV = [
   { path: "/proposals",  label: "Proposals",  ic: "✎" },
   { path: "/projects",   label: "Projects",   ic: "▦" },
   { path: "/timesheets", label: "Timesheets", ic: "◷" },
+  { path: "/expenses",   label: "Expenses",   ic: "▤" },
   { path: "/invoices",   label: "Invoices",   ic: "$" },
   { path: "/settings",   label: "Settings",   ic: "⚙" },
 ];

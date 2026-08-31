@@ -62,6 +62,7 @@ supabase/migrations/       SQL — run in the Supabase SQL editor, in order
 | 2 | Timesheets + timer | ✅ built |
 | 3 | Invoices + tax + numbering | ✅ built |
 | 4 | Proposals + templates + conversion | ✅ built |
+| 5 | Expenses (project & business, re-billable) | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
 

@@ -2,9 +2,10 @@
 // fill in during later phases).
 import { escapeHtml, money, date, minutesToHM, minutesToHours, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices, listProjectProposals } from "../core/api.js";
+import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices, listProjectProposals, listProjectExpenses } from "../core/api.js";
 import { editProject } from "./projects.js";
 import { editTimeEntry, confirmDeleteEntry } from "./time-entry-modal.js";
+import { editExpense } from "./expenses.js";
 import { newInvoiceFlow, effectiveStatus } from "./invoices.js";
 import { toastErr } from "../components/toast.js";
 
@@ -41,7 +42,7 @@ export async function render(root, ctx) {
     </div>
 
     <div class="tabs">
-      ${["overview", "time", "invoices", "proposals"].map((t) =>
+      ${["overview", "time", "expenses", "invoices", "proposals"].map((t) =>
         `<a href="#/projects/${id}?tab=${t}" class="${tab === t ? "active" : ""}">${t[0].toUpperCase() + t.slice(1)}</a>`).join("")}
     </div>
 
@@ -117,6 +118,8 @@ export async function render(root, ctx) {
     });
   } else if (tab === "time") {
     await renderTimeTab(pane, p, ctx);
+  } else if (tab === "expenses") {
+    await renderExpensesTab(pane, p, ctx);
   } else if (tab === "invoices") {
     await renderInvoicesTab(pane, p, ctx);
   } else if (tab === "proposals") {
@@ -178,6 +181,55 @@ async function renderTimeTab(pane, project, ctx) {
     if (ex) editTimeEntry({ existing: ex, onSaved: reload });
   });
   on(pane, "click", "[data-del-te]", (e, el) => confirmDeleteEntry(el.dataset.delTe, reload));
+}
+
+async function renderExpensesTab(pane, project, ctx) {
+  pane.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading expenses…</div>`;
+  const reload = () => renderExpensesTab(pane, project, ctx);
+  let rows;
+  try { rows = await listProjectExpenses(project.id); }
+  catch (err) { pane.innerHTML = `<div class="empty"><p class="faint">${escapeHtml(err.message)}</p></div>`; return; }
+
+  const total = rows.reduce((s, e) => s + Number(e.amount || 0), 0);
+  const billable = rows.filter((e) => e.billable);
+  const unbilled = billable.filter((e) => !e.invoice_id)
+    .reduce((s, e) => s + Number(e.amount || 0) * (1 + (Number(e.markup_pct) || 0) / 100), 0);
+
+  pane.innerHTML = `
+    <div class="grid-cards" style="margin-bottom:14px">
+      <div class="stat"><div class="k">Total spent</div><div class="v">${money(total)}</div></div>
+      <div class="stat"><div class="k">Billable</div><div class="v">${money(billable.reduce((s, e) => s + Number(e.amount || 0), 0))}</div></div>
+      <div class="stat"><div class="k">Unbilled (with markup)</div><div class="v">${money(unbilled)}</div></div>
+    </div>
+    <div class="between" style="margin-bottom:10px">
+      <h2 class="mt-0">Expenses</h2>
+      <button class="btn sm" data-new-exp>+ Add expense</button>
+    </div>
+    ${rows.length ? `
+      <div class="table-wrap"><table class="data">
+        <thead><tr><th>Date</th><th>Vendor</th><th>Category</th><th class="num">Amount</th><th>Billing</th><th></th></tr></thead>
+        <tbody>
+          ${rows.map((e) => `
+            <tr>
+              <td class="nowrap">${date(e.expense_date)}</td>
+              <td>${escapeHtml(e.vendor || "—")}${e.receipt_url ? ` <a href="${escapeHtml(e.receipt_url)}" target="_blank" rel="noopener">🧾</a>` : ""}</td>
+              <td class="muted">${escapeHtml(e.category?.name || "—")}</td>
+              <td class="num">${money(e.amount)}</td>
+              <td>${e.billable ? (e.invoice_id ? `<span class="badge green">billed</span>`
+                : `<span class="badge amber">billable${e.markup_pct ? ` +${e.markup_pct}%` : ""}</span>`)
+                : `<span class="badge grey">internal</span>`}</td>
+              <td class="right"><button class="btn link" data-edit-exp="${e.id}">edit</button></td>
+            </tr>`).join("")}
+        </tbody>
+      </table></div>` : `<div class="empty"><p class="faint">No expenses on this project yet.</p></div>`}`;
+
+  const map = new Map(rows.map((e) => [e.id, e]));
+  on(pane, "click", "[data-new-exp]", () =>
+    editExpense({ project_id: project.id }, reload));
+  on(pane, "click", "[data-edit-exp]", (e, el) => {
+    const ex = map.get(el.dataset.editExp);
+    if (ex) editExpense(ex, reload);
+  });
 }
 
 async function renderInvoicesTab(pane, project, ctx) {

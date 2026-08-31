@@ -36,6 +36,7 @@ That one file bundles every migration:
 | `0011_proposals.sql` | Proposals + templates (Phase 4); a converted proposal becomes a project |
 | `0012_contacts_categories.sql` | Multiple contacts per client; managed client categories; project contact override |
 | `0013_client_notes_category.sql` | One category per client; notes become a dated timeline (CRM) |
+| `0014_expenses.sql` | Expenses + expense categories (Phase 5) |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
@@ -58,10 +59,13 @@ just re-run `schema.sql` or the new file.)*
 few messages per hour. Fine for a small team. To lift it later: Authentication → Emails →
 SMTP Settings, and plug in any SMTP provider.)*
 
-## 4. Create the logo storage bucket
+## 4. Create the storage buckets
 
-**Storage → New bucket**: name `branding`, **Public bucket: on**. Create.
-(Only needed for the logo upload in Settings — skip if you don't use it.)
+**Storage → New bucket** (twice):
+- `branding` — **Public: on** — logo upload in Settings.
+- `receipts` — **Public: on** — expense receipt uploads.
+
+Both optional. "Public" means anyone with the exact (random) file URL can open it.
 
 ## 5. Point the app at your project
 
