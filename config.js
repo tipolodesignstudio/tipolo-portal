@@ -7,3 +7,8 @@ export const SUPABASE_URL = "https://woixzayvkbbhergpthfr.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_va98-sMw_lbLg8dnN_WE4A_uqCM8NQ5";
 
 export const ALLOWED_EMAIL_DOMAIN = "tipolo.ca";
+
+// hCaptcha site key (public). Leave as-is to disable the captcha widget.
+// Get one at hcaptcha.com; the paired SECRET key goes in Supabase
+// (Authentication → Attack Protection → Captcha → hCaptcha).
+export const HCAPTCHA_SITE_KEY = "YOUR-HCAPTCHA-SITE-KEY";

@@ -10,3 +10,6 @@ export const SUPABASE_ANON_KEY = "YOUR-ANON-PUBLIC-KEY";
 
 // Accounts are limited to this email domain (also enforced in the database).
 export const ALLOWED_EMAIL_DOMAIN = "tipolo.ca";
+
+// hCaptcha site key (public). Leave the placeholder to disable the captcha widget.
+export const HCAPTCHA_SITE_KEY = "YOUR-HCAPTCHA-SITE-KEY";

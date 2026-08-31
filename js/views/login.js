@@ -3,15 +3,18 @@
 import { escapeHtml } from "../core/format.js";
 import { ALLOWED_EMAIL_DOMAIN } from "../../config.js";
 import { signIn, signUp, sendReset, updatePassword, emailAllowed } from "../core/auth.js";
+import { captchaEnabled, mountCaptcha } from "../core/captcha.js";
 
 let mode = "signin"; // signin | signup | forgot | sent | reset
 let notice = "";
+let captcha = null;   // active hCaptcha handle
 
 export function setMode(m) { mode = m; }
 
 export function render(root, ctx = {}) {
   if (ctx.mode) mode = ctx.mode;
   root.removeAttribute("aria-busy");
+  if (captcha) { captcha.remove(); captcha = null; }
   root.innerHTML = `
     <div class="auth-wrap">
       <div class="auth-card">
@@ -31,6 +34,8 @@ function body() {
 }
 
 const errSlot = `<div class="alert error" data-err style="display:none;margin-bottom:14px"></div>`;
+const captchaSlot = () =>
+  captchaEnabled ? `<div data-captcha style="margin:12px 0;min-height:78px"></div>` : "";
 const noticeSlot = () =>
   notice ? `<div class="alert success" style="margin-bottom:14px">${escapeHtml(notice)}</div>` : "";
 
@@ -48,6 +53,7 @@ function signinBody() {
         <label class="lbl" for="p">Password</label>
         <input id="p" name="password" type="password" autocomplete="current-password" required />
       </div>
+      ${captchaSlot()}
       <button class="btn block" type="submit">Sign in</button>
       <div class="row-between">
         <button type="button" class="btn link" data-go="forgot">Forgot password?</button>
@@ -79,6 +85,7 @@ function signupBody() {
                minlength="8" required />
         <div class="hint">At least 8 characters.</div>
       </div>
+      ${captchaSlot()}
       <button class="btn block" type="submit">Create account</button>
     </form>
     <div class="auth-switch">
@@ -96,6 +103,7 @@ function forgotBody() {
         <label class="lbl" for="e">Email</label>
         <input id="e" name="email" type="email" autocomplete="email" required />
       </div>
+      ${captchaSlot()}
       <button class="btn block" type="submit">Send reset link</button>
     </form>
     <div class="auth-switch">
@@ -134,27 +142,38 @@ function wire(root) {
   const errBox = root.querySelector("[data-err]");
   const showErr = (m) => { if (errBox) { errBox.textContent = m; errBox.style.display = "block"; } };
 
+  const capBox = root.querySelector("[data-captcha]");
+  if (capBox) {
+    mountCaptcha(capBox).then((h) => { captcha = h; })
+      .catch((err) => showErr(err.message));
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (errBox) errBox.style.display = "none";
     const btn = form.querySelector("button[type=submit]");
     const data = Object.fromEntries(new FormData(form));
+    const kind = form.dataset.form;
+
+    const needsCaptcha = captchaEnabled && ["signin", "signup", "forgot"].includes(kind);
+    const token = needsCaptcha ? captcha?.token() : undefined;
+    if (needsCaptcha && !token) { showErr("Complete the captcha to continue."); return; }
+
     btn.disabled = true;
     const label = btn.textContent;
     btn.innerHTML = `<span class="spinner"></span>`;
     try {
-      const kind = form.dataset.form;
       if (kind === "signin") {
-        await signIn(data.email, data.password);
+        await signIn(data.email, data.password, token);
       } else if (kind === "signup") {
         if (!emailAllowed(data.email)) throw new Error(
           `Sign-ups are limited to @${ALLOWED_EMAIL_DOMAIN} email addresses.`);
-        const res = await signUp(data.email, data.password, data.fullName);
+        const res = await signUp(data.email, data.password, data.fullName, token);
         if (res.session) return; // auto-confirmed: app.js takes over
         notice = `We've sent a confirmation link to ${data.email}. Click it, then sign in.`;
         mode = "sent"; render(root); return;
       } else if (kind === "forgot") {
-        await sendReset(data.email);
+        await sendReset(data.email, token);
         notice = `If an account exists for ${data.email}, a reset link is on its way.`;
         mode = "sent"; render(root); return;
       } else if (kind === "reset") {
@@ -165,6 +184,7 @@ function wire(root) {
       }
     } catch (err) {
       showErr((err && err.message) || String(err));
+      captcha?.reset();
       btn.disabled = false;
       btn.textContent = label;
     }

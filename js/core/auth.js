@@ -20,13 +20,15 @@ export function onAuthChange(cb) {
   return () => data.subscription.unsubscribe();
 }
 
-export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+export async function signIn(email, password, captchaToken) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim(), password, options: { captchaToken },
+  });
   if (error) throw friendly(error, email);
   return data;
 }
 
-export async function signUp(email, password, fullName) {
+export async function signUp(email, password, fullName, captchaToken) {
   const clean = email.trim();
   if (!emailAllowed(clean)) {
     throw new Error(`Sign-ups are limited to @${ALLOWED_EMAIL_DOMAIN} email addresses.`);
@@ -35,6 +37,7 @@ export async function signUp(email, password, fullName) {
     email: clean,
     password,
     options: {
+      captchaToken,
       data: { full_name: (fullName || "").trim() || undefined },
       emailRedirectTo: window.location.origin + window.location.pathname,
     },
@@ -43,9 +46,10 @@ export async function signUp(email, password, fullName) {
   return data; // data.session is null when email confirmation is required
 }
 
-export async function sendReset(email) {
+export async function sendReset(email, captchaToken) {
   const clean = email.trim();
   const { error } = await supabase.auth.resetPasswordForEmail(clean, {
+    captchaToken,
     redirectTo: window.location.origin + window.location.pathname + "#/reset-password",
   });
   if (error) throw friendly(error, clean);
@@ -82,6 +86,9 @@ function friendly(error, email) {
   }
   if (/password should be at least/i.test(msg)) {
     return new Error("Password must be at least 6 characters.");
+  }
+  if (/captcha/i.test(msg)) {
+    return new Error("Captcha check failed — tick the box again and retry.");
   }
   return new Error(msg);
 }

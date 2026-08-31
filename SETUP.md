@@ -60,6 +60,18 @@ just re-run `schema.sql` or the new file.)*
 few messages per hour. Fine for a small team. To lift it later: Authentication → Emails →
 SMTP Settings, and plug in any SMTP provider.)*
 
+### hCaptcha (bot protection on the sign-in screen)
+
+1. Sign up at <https://www.hcaptcha.com> → **New site** → add `portal.tipolo.ca` and
+   `localhost`. You get a **Site Key** (public) and a **Secret Key**.
+2. Supabase → **Authentication → Attack Protection → Enable Captcha protection** →
+   provider **hCaptcha** → paste the **Secret Key** → Save.
+3. Put the **Site Key** in `config.js`:
+   ```js
+   export const HCAPTCHA_SITE_KEY = "10000000-ffff-ffff-ffff-000000000001"; // your real key
+   ```
+   Leaving the placeholder disables the widget (and Supabase captcha must then be off).
+
 ## 4. Create the storage buckets
 
 **Storage → New bucket** (twice):
