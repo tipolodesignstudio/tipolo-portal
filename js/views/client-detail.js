@@ -26,7 +26,8 @@ export async function render(root, ctx) {
         <div class="faint" style="font-size:.85rem"><a href="#/clients">← Clients</a></div>
         <h1>${escapeHtml(client.name)}
           ${client.status === "archived" ? `<span class="badge grey">archived</span>` : ""}</h1>
-        <div class="muted">${escapeHtml(client.company || "")}</div>
+        <div class="muted">${client.is_individual ? "Individual client"
+          : escapeHtml(client.contact_name || "")}</div>
       </div>
       <div class="cluster">
         <button class="btn ghost" data-edit-client>Edit client</button>
@@ -37,6 +38,7 @@ export async function render(root, ctx) {
     <div class="card">
       <h2>Contact</h2>
       <dl class="kv">
+        ${client.is_individual ? "" : `<dt>Contact</dt><dd>${escapeHtml(client.contact_name || "—")}</dd>`}
         <dt>Email</dt><dd>${client.email ? `<a href="mailto:${escapeHtml(client.email)}">${escapeHtml(client.email)}</a>` : "—"}</dd>
         <dt>Phone</dt><dd>${escapeHtml(client.phone || "—")}</dd>
         <dt>Address</dt><dd style="white-space:pre-wrap">${escapeHtml(client.address || "—")}</dd>

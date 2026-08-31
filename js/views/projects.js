@@ -107,7 +107,7 @@ export async function editProject(existing, onSaved) {
       ${field("title", "Title", p.title, { required: true })}
       ${row(
         select("client_id", "Client", p.client_id || existing?.client_id, clients.map((c) => ({
-          value: c.id, label: c.company ? `${c.name} — ${c.company}` : c.name,
+          value: c.id, label: c.name,
         })), { required: true }),
         select("scope", "Scope", p.scope || "other", SCOPES.map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }))),
       )}

@@ -84,19 +84,20 @@ create trigger app_settings_set_updated_at
 -- clients
 -- ---------------------------------------------------------------------------
 create table if not exists public.clients (
-  id           uuid primary key default gen_random_uuid(),
-  name         text not null,
-  company      text,
-  email        text,
-  phone        text,
-  address      text,
-  notes        text,
-  default_rate numeric(10,2),
-  tags         text[] not null default '{}',
-  status       text not null default 'active',   -- 'active' | 'archived'
-  created_by   uuid references auth.users(id) default auth.uid(),
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  name          text not null,                    -- client / business name (primary identity)
+  contact_name  text,                             -- individual to deal with
+  is_individual boolean not null default false,   -- true => name mirrors contact_name
+  email         text,
+  phone         text,
+  address       text,
+  notes         text,
+  default_rate  numeric(10,2),
+  tags          text[] not null default '{}',
+  status        text not null default 'active',   -- 'active' | 'archived'
+  created_by    uuid references auth.users(id) default auth.uid(),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
 create index if not exists clients_status_idx on public.clients (status);
@@ -338,4 +339,40 @@ alter table public.time_entries enable row level security;
 drop policy if exists time_entries_all on public.time_entries;
 create policy time_entries_all on public.time_entries
   for all to authenticated using (true) with check (true);
+
+-- ================================================================
+-- migrations/0007_clients_contact.sql
+-- ================================================================
+-- 0007_clients_contact.sql  (Phase 1 revision)
+-- Clients are primarily businesses. `name` now holds the CLIENT / business name
+-- (what projects link to and what lists show). `contact_name` is the individual to
+-- deal with. For an individual client with no business, the UI keeps name = contact_name
+-- and sets is_individual = true.
+--
+-- Safe to run on a fresh database (where 0001 already created the new shape and the
+-- old `company` column never existed) or on the earlier schema.
+
+alter table public.clients add column if not exists contact_name text;
+alter table public.clients add column if not exists is_individual boolean not null default false;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'clients' and column_name = 'company'
+  ) then
+    -- old shape: name = person, company = business -> flip
+    update public.clients
+       set contact_name = name,
+           name         = company
+     where company is not null and btrim(company) <> '';
+
+    update public.clients
+       set is_individual = true,
+           contact_name  = coalesce(contact_name, name)
+     where company is null or btrim(company) = '';
+
+    alter table public.clients drop column company;
+  end if;
+end $$;
 

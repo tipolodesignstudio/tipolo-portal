@@ -59,7 +59,7 @@ export async function listClients({ search = "", status = "active" } = {}) {
   if (status && status !== "all") q = q.eq("status", status);
   if (search.trim()) {
     const s = `%${search.trim()}%`;
-    q = q.or(`name.ilike.${s},company.ilike.${s},email.ilike.${s}`);
+    q = q.or(`name.ilike.${s},contact_name.ilike.${s},email.ilike.${s}`);
   }
   const rows = unwrap(await q);
   return rows.map((r) => ({ ...r, project_count: r.projects?.[0]?.count ?? 0 }));
@@ -79,7 +79,7 @@ export async function updateClient(id, patch) {
 
 /* ---------------- projects ---------------- */
 
-const PROJECT_SELECT = "*, client:clients(id, name, company, default_rate)";
+const PROJECT_SELECT = "*, client:clients(id, name, contact_name, is_individual, default_rate)";
 
 export async function listProjects({ search = "", status = "", scope = "", clientId = "" } = {}) {
   let q = supabase.from("projects").select(PROJECT_SELECT).order("updated_at", { ascending: false });

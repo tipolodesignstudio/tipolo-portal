@@ -13,7 +13,7 @@
 import { escapeHtml } from "../core/format.js";
 
 export function openModal({ title, body, confirmText = "Save", cancelText = "Cancel",
-                            onConfirm, size, danger = false }) {
+                            onConfirm, onOpen, size, danger = false }) {
   return new Promise((resolve) => {
     const dlg = document.createElement("dialog");
     dlg.className = "modal";
@@ -69,6 +69,7 @@ export function openModal({ title, body, confirmText = "Save", cancelText = "Can
 
     document.body.appendChild(dlg);
     dlg.showModal();
+    if (onOpen) try { onOpen(dlg); } catch (err) { console.error(err); }
     const first = dlg.querySelector("input, select, textarea");
     if (first) first.focus();
   });

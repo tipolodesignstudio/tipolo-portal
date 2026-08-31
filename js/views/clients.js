@@ -1,7 +1,9 @@
 // Clients list: search, active/archived filter, create/edit.
+// A client's primary identity is `name` — the business name, or the person's name for
+// an individual client (is_individual). `contact_name` is the person to deal with.
 import { escapeHtml, debounce, money } from "../core/format.js";
 import { on } from "../core/render.js";
-import { listClients, createClient, updateClient } from "../core/api.js";
+import { listClients, createClient, updateClient, getClient } from "../core/api.js";
 import { openModal } from "../components/modal.js";
 import { field, textarea, row, readForm, nullIfEmpty } from "../components/form.js";
 import { toastOk, toastErr } from "../components/toast.js";
@@ -12,11 +14,11 @@ export async function render(root, ctx) {
   ctx.setCrumbs?.("Clients");
   root.innerHTML = `
     <div class="page-head">
-      <div><h1>Clients</h1><div class="muted">People and companies you work with.</div></div>
+      <div><h1>Clients</h1><div class="muted">Businesses and individuals you work with.</div></div>
       <button class="btn" data-new-client>+ New client</button>
     </div>
     <div class="filters">
-      <input class="search" type="search" placeholder="Search name, company, email…"
+      <input class="search" type="search" placeholder="Search client, contact, email…"
              value="${escapeHtml(state.search)}" data-search />
       <div class="seg" data-status>
         ${["active", "archived", "all"].map((s) =>
@@ -51,10 +53,9 @@ export async function render(root, ctx) {
     if (e.target.closest("[data-edit]")) return;
     ctx.navigate(`/clients/${tr.dataset.id}`);
   });
-  on(root, "click", "[data-edit]", async (e, btn) => {
+  on(root, "click", "[data-edit]", (e, btn) => {
     e.stopPropagation();
-    const tr = btn.closest("tr");
-    editClient({ id: tr.dataset.id }, refresh, true);
+    editClient({ id: btn.closest("tr").dataset.id }, refresh, true);
   });
 
   await refresh();
@@ -65,14 +66,14 @@ function table(rows) {
     <div class="table-wrap">
       <table class="data">
         <thead><tr>
-          <th>Name</th><th>Company</th><th>Email</th>
+          <th>Client</th><th>Contact</th><th>Email</th>
           <th class="num">Projects</th><th class="num">Rate</th><th></th>
         </tr></thead>
         <tbody>
           ${rows.map((c) => `
             <tr class="clickable" data-id="${c.id}">
               <td>${escapeHtml(c.name)}${c.status === "archived" ? ` <span class="badge grey">archived</span>` : ""}</td>
-              <td class="muted">${escapeHtml(c.company || "—")}</td>
+              <td class="muted">${c.is_individual ? `<span class="faint">individual</span>` : escapeHtml(c.contact_name || "—")}</td>
               <td class="muted">${escapeHtml(c.email || "—")}</td>
               <td class="num">${c.project_count}</td>
               <td class="num">${c.default_rate != null ? money(c.default_rate) : "—"}</td>
@@ -92,7 +93,6 @@ function empty() {
 export async function editClient(existing, onSaved, fetchFirst = false) {
   let c = existing || {};
   if (fetchFirst && existing?.id) {
-    const { getClient } = await import("../core/api.js");
     try { c = await getClient(existing.id); } catch (err) { toastErr(err.message); return; }
   }
   const isNew = !c.id;
@@ -101,15 +101,20 @@ export async function editClient(existing, onSaved, fetchFirst = false) {
     title: isNew ? "New client" : "Edit client",
     confirmText: isNew ? "Create client" : "Save",
     body: `<form class="form-grid">
-      ${field("name", "Name", c.name, { required: true })}
+      <label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
+        <input type="checkbox" name="is_individual" ${c.is_individual ? "checked" : ""} style="width:auto" />
+        Individual client (no separate business name)
+      </label>
+      <div data-biz-field>
+        ${field("business_name", "Client / business name", c.is_individual ? "" : c.name, { required: true })}
+      </div>
+      ${field("contact_name", "Contact person", c.is_individual ? c.name : c.contact_name,
+        { hint: "The individual you deal with" })}
       ${row(
-        field("company", "Company", c.company),
         field("email", "Email", c.email, { type: "email" }),
-      )}
-      ${row(
         field("phone", "Phone", c.phone),
-        field("default_rate", "Default hourly rate", c.default_rate, { type: "number", step: "0.01", min: 0 }),
       )}
+      ${field("default_rate", "Default hourly rate", c.default_rate, { type: "number", step: "0.01", min: 0 })}
       ${textarea("address", "Address", c.address, { rows: 2 })}
       ${textarea("notes", "Notes", c.notes, { rows: 3 })}
       ${field("tags", "Tags", (c.tags || []).join(", "), { hint: "Comma-separated" })}
@@ -117,11 +122,31 @@ export async function editClient(existing, onSaved, fetchFirst = false) {
         <input type="checkbox" name="archived" ${c.status === "archived" ? "checked" : ""} style="width:auto" />
         Archived</label>` : ""}
     </form>`,
+    onOpen: (dlg) => {
+      const form = dlg.querySelector("form");
+      const indiv = form.elements.is_individual;
+      const bizWrap = form.querySelector("[data-biz-field]");
+      const bizInput = form.elements.business_name;
+      const contact = form.elements.contact_name;
+      const sync = () => {
+        const on = indiv.checked;
+        bizWrap.style.display = on ? "none" : "";
+        bizInput.required = !on;
+        contact.previousElementSibling.textContent = on ? "Name" : "Contact person";
+        contact.required = on;
+      };
+      indiv.addEventListener("change", sync);
+      sync();
+    },
     onConfirm: async (dlg) => {
       const f = readForm(dlg.querySelector("form"));
+      const individual = !!f.is_individual;
+      const name = individual ? f.contact_name : f.business_name;
+      if (!name) throw new Error(individual ? "Enter the client's name." : "Enter the business name.");
       const patch = {
-        name: f.name,
-        company: nullIfEmpty(f.company),
+        name,
+        contact_name: nullIfEmpty(f.contact_name) || (individual ? name : null),
+        is_individual: individual,
         email: nullIfEmpty(f.email),
         phone: nullIfEmpty(f.phone),
         address: nullIfEmpty(f.address),
