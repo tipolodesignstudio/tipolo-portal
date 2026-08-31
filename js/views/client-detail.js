@@ -1,17 +1,19 @@
 // Client detail: contact card + this client's projects.
 import { escapeHtml, money, date, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getClient, listProjects } from "../core/api.js";
+import { getClient, listProjects, listProposals } from "../core/api.js";
 import { editClient } from "./clients.js";
-import { editProject } from "./projects.js";
+import { newProposalFlow } from "./proposals.js";
 
 export async function render(root, ctx) {
   const id = ctx.params.id;
   root.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading…</div>`;
 
-  let client, projects;
+  let client, projects, proposals;
   try {
-    [client, projects] = await Promise.all([getClient(id), listProjects({ clientId: id })]);
+    [client, projects, proposals] = await Promise.all([
+      getClient(id), listProjects({ clientId: id }), listProposals({ clientId: id }),
+    ]);
   } catch (err) {
     root.innerHTML = `<div class="empty"><h3>Client not found</h3>
       <p class="faint">${escapeHtml(err.message)}</p>
@@ -31,7 +33,7 @@ export async function render(root, ctx) {
       </div>
       <div class="cluster">
         <button class="btn ghost" data-edit-client>Edit client</button>
-        <button class="btn" data-new-project>+ New project</button>
+        <button class="btn" data-new-proposal>+ New proposal</button>
       </div>
     </div>
 
@@ -49,15 +51,38 @@ export async function render(root, ctx) {
     </div>
 
     <div class="card">
+      <div class="between"><h2 class="mt-0">Proposals</h2><span class="faint">${proposals.length}</span></div>
+      <div>${proposalList(proposals)}</div>
+    </div>
+
+    <div class="card">
       <div class="between"><h2 class="mt-0">Projects</h2><span class="faint">${projects.length}</span></div>
       <div id="proj-list">${projectList(projects)}</div>
     </div>`;
 
   on(root, "click", "[data-edit-client]", () =>
     editClient({ id: client.id }, () => ctx.navigate(ctx.path), true));
-  on(root, "click", "[data-new-project]", () =>
-    editProject({ client_id: client.id }, () => ctx.navigate(ctx.path)));
+  on(root, "click", "[data-new-proposal]", () => newProposalFlow(ctx, client.id));
   on(root, "click", "tr[data-pid]", (e, tr) => ctx.navigate(`/projects/${tr.dataset.pid}`));
+  on(root, "click", "tr[data-prop]", (e, tr) => ctx.navigate(`/proposals/${tr.dataset.prop}`));
+}
+
+function proposalList(proposals) {
+  if (!proposals.length) return `<div class="empty"><p class="faint">No proposals for this client yet.</p></div>`;
+  const TONE = { draft: "grey", sent: "amber", accepted: "green", declined: "red" };
+  return `
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>No.</th><th>Title</th><th class="num">Fee</th><th>Status</th></tr></thead>
+      <tbody>
+        ${proposals.map((p) => `
+          <tr class="clickable" data-prop="${p.id}">
+            <td class="muted nowrap">${escapeHtml(p.number || "—")}</td>
+            <td>${escapeHtml(p.title)}</td>
+            <td class="num">${money(p.subtotal)}</td>
+            <td><span class="badge ${TONE[p.status] || "grey"}">${p.status}</span></td>
+          </tr>`).join("")}
+      </tbody>
+    </table></div>`;
 }
 
 function addressBlock(c) {

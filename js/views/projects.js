@@ -15,8 +15,8 @@ export async function render(root, ctx) {
   ctx.setCrumbs?.("Projects");
   root.innerHTML = `
     <div class="page-head">
-      <div><h1>Projects</h1><div class="muted">Everything you're working on.</div></div>
-      <button class="btn" data-new-project>+ New project</button>
+      <div><h1>Projects</h1><div class="muted">Projects are created by converting an accepted proposal.</div></div>
+      <a class="btn ghost" href="#/proposals">Proposals →</a>
     </div>
     <div class="filters">
       <input class="search" type="search" placeholder="Search title, description…"
@@ -47,7 +47,6 @@ export async function render(root, ctx) {
 
   on(root, "input", "[data-search]", debounce((e) => { state.search = e.target.value; refresh(); }, 250));
   on(root, "change", "[data-f]", (e) => { state[e.target.dataset.f] = e.target.value; refresh(); });
-  on(root, "click", "[data-new-project]", () => editProject(null, refresh));
   on(root, "click", "tr[data-id]", (e, tr) => ctx.navigate(`/projects/${tr.dataset.id}`));
 
   await refresh();
@@ -75,8 +74,9 @@ function table(rows) {
 }
 
 function empty() {
-  return `<div class="empty"><h3>No projects</h3>
-    <p class="faint">Create a project — you'll need a client first.</p></div>`;
+  return `<div class="empty"><h3>No projects yet</h3>
+    <p class="faint">Projects appear here once you convert an accepted
+    <a href="#/proposals">proposal</a>.</p></div>`;
 }
 
 /* ---- create / edit modal (exported for reuse) ---- */

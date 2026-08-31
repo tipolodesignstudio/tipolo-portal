@@ -2,7 +2,7 @@
 // fill in during later phases).
 import { escapeHtml, money, date, minutesToHM, minutesToHours, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices } from "../core/api.js";
+import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices, listProjectProposals } from "../core/api.js";
 import { editProject } from "./projects.js";
 import { editTimeEntry, confirmDeleteEntry } from "./time-entry-modal.js";
 import { newInvoiceFlow, effectiveStatus } from "./invoices.js";
@@ -114,9 +114,8 @@ export async function render(root, ctx) {
     await renderTimeTab(pane, p, ctx);
   } else if (tab === "invoices") {
     await renderInvoicesTab(pane, p, ctx);
-  } else {
-    pane.innerHTML = `<div class="empty"><h3>Proposals</h3>
-      <p class="faint">Arrives in Phase 4.</p></div>`;
+  } else if (tab === "proposals") {
+    await renderProposalsTab(pane, p, ctx);
   }
 
   on(root, "click", "[data-edit]", () => editProject({ id }, () => ctx.navigate(ctx.path)));
@@ -206,4 +205,28 @@ async function renderInvoicesTab(pane, project, ctx) {
 
   on(pane, "click", "[data-new-inv]", () => newInvoiceFlow(ctx, project.id));
   on(pane, "click", "[data-inv]", (e, el) => ctx.navigate(`/invoices/${el.dataset.inv}`));
+}
+
+async function renderProposalsTab(pane, project, ctx) {
+  pane.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading…</div>`;
+  let proposals;
+  try { proposals = await listProjectProposals(project.id); }
+  catch (err) { pane.innerHTML = `<div class="empty"><p class="faint">${escapeHtml(err.message)}</p></div>`; return; }
+
+  pane.innerHTML = proposals.length ? `
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>No.</th><th>Title</th><th class="num">Fee</th><th>Status</th></tr></thead>
+      <tbody>
+        ${proposals.map((p) => `
+          <tr class="clickable" data-prop="${p.id}">
+            <td class="muted nowrap">${escapeHtml(p.number || "—")}</td>
+            <td>${escapeHtml(p.title)}</td>
+            <td class="num">${money(p.subtotal)}</td>
+            <td><span class="badge grey">${escapeHtml(p.status)}</span></td>
+          </tr>`).join("")}
+      </tbody>
+    </table></div>`
+    : `<div class="empty"><p class="faint">This project was created directly (no linked proposal).</p></div>`;
+
+  on(pane, "click", "[data-prop]", (e, el) => ctx.navigate(`/proposals/${el.dataset.prop}`));
 }

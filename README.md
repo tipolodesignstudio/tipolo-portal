@@ -58,10 +58,10 @@ supabase/migrations/       SQL — run in the Supabase SQL editor, in order
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 0 | Auth, app shell, Settings, deploy | ✅ built |
-| 1 | Clients + Projects + Dashboard stats | ✅ built |
+| 1 | Clients + Projects (projects now come from proposals) | ✅ built |
 | 2 | Timesheets + timer | ✅ built |
 | 3 | Invoices + tax + numbering | ✅ built |
-| 4 | Proposal templates | planned |
+| 4 | Proposals + templates + conversion | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
 

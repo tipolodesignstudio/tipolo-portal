@@ -36,6 +36,9 @@ export async function render(root, ctx) {
     <div class="grid-cards" style="margin-bottom:16px">
       <a class="stat" href="#/clients" style="text-decoration:none">
         <div class="k">Active clients</div><div class="v">${stats.activeClients}</div></a>
+      <a class="stat" href="#/proposals" style="text-decoration:none">
+        <div class="k">Open proposals</div><div class="v">${stats.openProposals ?? 0}</div>
+        <div class="d">draft + sent</div></a>
       <a class="stat" href="#/projects?status=active" style="text-decoration:none" data-nav-soft>
         <div class="k">Active projects</div><div class="v">${stats.activeProjects}</div></a>
       <a class="stat" href="#/timesheets" style="text-decoration:none">

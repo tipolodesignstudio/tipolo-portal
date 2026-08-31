@@ -33,6 +33,7 @@ That one file bundles every migration:
 | `0008_client_address.sql` | Structured address: street / city / province / postal_code |
 | `0009_numbering.sql` | Job numbers `YYNNN` on projects; `next_job_number()` / `next_invoice_number()` |
 | `0010_invoices.sql` | Invoices table (Phase 3) — one invoice per project, number `YYNNN-XX` |
+| `0011_proposals.sql` | Proposals + templates (Phase 4); a converted proposal becomes a project |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,

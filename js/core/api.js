@@ -161,6 +161,14 @@ export async function getDashboardStats() {
     }
   } catch { /* time_entries table may not exist yet */ }
 
+  // open proposals (Phase 4)
+  let openProposals = 0;
+  try {
+    const pr = await supabase.from("proposals")
+      .select("id", { count: "exact", head: true }).in("status", ["draft", "sent"]);
+    if (!pr.error) openProposals = pr.count ?? 0;
+  } catch { /* proposals table may not exist yet */ }
+
   // invoice figures (Phase 3)
   let invoices = { outstanding: 0, overdueCount: 0, paidThisMonth: 0 };
   try {
@@ -188,6 +196,7 @@ export async function getDashboardStats() {
     recent: rows.slice(0, 6),
     unbilled,
     invoices,
+    openProposals,
   };
 }
 
@@ -349,6 +358,81 @@ export async function listProjectsForInvoicing() {
       .select("id, number, title, status, client:clients(name)")
       .order("number", { ascending: false })
   );
+}
+
+/* ---------------- proposal templates ---------------- */
+
+export async function listTemplates() {
+  return unwrap(await supabase.from("proposal_templates").select("*").order("name"));
+}
+export async function getTemplate(id) {
+  return unwrap(await supabase.from("proposal_templates").select("*").eq("id", id).single());
+}
+export async function createTemplate(patch) {
+  return unwrap(await supabase.from("proposal_templates").insert(patch).select().single());
+}
+export async function updateTemplate(id, patch) {
+  return unwrap(await supabase.from("proposal_templates").update(patch).eq("id", id).select().single());
+}
+export async function deleteTemplate(id) {
+  const { error } = await supabase.from("proposal_templates").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/* ---------------- proposals ---------------- */
+
+const PROPOSAL_SELECT =
+  "*, client:clients(id, name, contact_name, is_individual, email, street, city, province, postal_code), " +
+  "converted_project:converted_project_id(id, number, status)";
+
+export async function listProposals({ status = "", clientId = "" } = {}) {
+  let q = supabase.from("proposals").select(PROPOSAL_SELECT).order("created_at", { ascending: false });
+  if (status && status !== "all") q = q.eq("status", status);
+  if (clientId) q = q.eq("client_id", clientId);
+  return unwrap(await q);
+}
+export async function getProposal(id) {
+  return unwrap(await supabase.from("proposals").select(PROPOSAL_SELECT).eq("id", id).single());
+}
+export async function listProjectProposals(projectId) {
+  return unwrap(
+    await supabase.from("proposals").select("id, number, title, status, subtotal")
+      .eq("converted_project_id", projectId).order("created_at")
+  );
+}
+export async function createProposal(patch) {
+  return unwrap(await supabase.from("proposals").insert(patch).select(PROPOSAL_SELECT).single());
+}
+export async function updateProposal(id, patch) {
+  return unwrap(await supabase.from("proposals").update(patch).eq("id", id).select(PROPOSAL_SELECT).single());
+}
+export async function deleteProposal(id) {
+  const { error } = await supabase.from("proposals").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+export async function setProposalStatus(id, status) {
+  const patch = { status };
+  if (status === "sent") patch.sent_date = isoToday();
+  if (status === "accepted" || status === "declined") patch.decided_date = isoToday();
+  return updateProposal(id, patch);
+}
+
+// Convert an accepted proposal to a project. The project takes the proposal's number.
+export async function convertProposal(proposal, { status = "lead", start_date = null,
+                                                  due_date = null, deliverables = [] } = {}) {
+  const project = unwrap(await supabase.from("projects").insert({
+    number: proposal.number,               // trigger skips because it's set
+    client_id: proposal.client_id,
+    title: proposal.title,
+    scope: proposal.project_scope,
+    status,
+    start_date,
+    due_date,
+    deliverables,
+  }).select("*, client:clients(id, name)").single());
+
+  await updateProposal(proposal.id, { converted_project_id: project.id });
+  return project;
 }
 
 /* ---------------- storage (branding logo) ---------------- */
