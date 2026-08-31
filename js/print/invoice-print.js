@@ -2,11 +2,13 @@
 // print dialog ("Save as PDF"). Styling lives in css/print.css (.doc rules).
 import { escapeHtml, money, num, date } from "../core/format.js";
 import { computeTotals, lineAmount } from "../core/invoice-calc.js";
+import { billingContact } from "../core/api.js";
 
 export function printInvoice(inv, settings = {}) {
   const t = computeTotals(inv.line_items || [], settings.tax_lines || []);
   const biz = settings || {};
   const c = (inv.project && inv.project.client) || {};
+  const contact = billingContact(inv.project);
 
   const bizLines = [
     biz.address, // legacy single line, if present
@@ -45,9 +47,9 @@ export function printInvoice(inv, settings = {}) {
         <div>
           <h4>Bill to</h4>
           <div>${escapeHtml(c.name || "")}</div>
-          ${!c.is_individual && c.contact_name ? `<div>Attn: ${escapeHtml(c.contact_name)}</div>` : ""}
+          ${!c.is_individual && contact ? `<div>Attn: ${escapeHtml(contact.name)}${contact.title ? `, ${escapeHtml(contact.title)}` : ""}</div>` : ""}
           <div style="white-space:pre-line">${clientAddr.map(escapeHtml).join("\n")}</div>
-          ${c.email ? `<div>${escapeHtml(c.email)}</div>` : ""}
+          ${(contact && contact.email) || c.email ? `<div>${escapeHtml((contact && contact.email) || c.email)}</div>` : ""}
         </div>
       </div>
 

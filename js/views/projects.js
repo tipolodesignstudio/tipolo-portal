@@ -1,7 +1,7 @@
 // Projects list: search + status + scope filters, create/edit.
 import { escapeHtml, debounce, money, date, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { listProjects, createProject, updateProject, getProject, listClients } from "../core/api.js";
+import { listProjects, updateProject, getProject } from "../core/api.js";
 import { openModal } from "../components/modal.js";
 import { field, textarea, select, row, readForm } from "../components/form.js";
 import { toastOk, toastErr } from "../components/toast.js";
@@ -79,69 +79,52 @@ function empty() {
     <a href="#/proposals">proposal</a>.</p></div>`;
 }
 
-/* ---- create / edit modal (exported for reuse) ---- */
+/* ---- edit an existing project (new projects come from proposal conversion) ---- */
 export async function editProject(existing, onSaved) {
-  let p = existing || {};
-  const isNew = !p.id;
-  if (!isNew) {
-    try { p = await getProject(p.id); } catch (err) { toastErr(err.message); return; }
-  }
-
-  let clients;
-  try { clients = await listClients({ status: "all" }); }
-  catch (err) { toastErr("Couldn't load clients: " + err.message); return; }
-
-  if (!clients.length) {
-    await openModal({
-      title: "Add a client first",
-      body: `<p>Projects belong to a client. Create a client, then add the project.</p>`,
-      confirmText: "OK", onConfirm: () => true,
-    });
-    return;
-  }
+  let p;
+  try { p = await getProject(existing.id); } catch (err) { toastErr(err.message); return; }
+  const contacts = p.client?.contacts || [];
 
   const result = await openModal({
-    title: isNew ? "New project" : "Edit project",
-    confirmText: isNew ? "Create project" : "Save",
+    title: `Edit ${p.number ? p.number + " · " : ""}${p.title}`,
+    confirmText: "Save",
     size: "lg",
     body: `<form class="form-grid">
       ${field("title", "Title", p.title, { required: true })}
+      <div class="field"><label class="lbl">Client</label>
+        <div class="input" style="background:var(--bg-alt)">${escapeHtml(p.client?.name || "—")}</div></div>
       ${row(
-        select("client_id", "Client", p.client_id || existing?.client_id, clients.map((c) => ({
-          value: c.id, label: c.name,
-        })), { required: true }),
         select("scope", "Scope", p.scope || "other", SCOPES.map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }))),
-      )}
-      ${row(
         select("status", "Status", p.status || "lead", STATUSES.map((s) => ({ value: s, label: STATUS_LABELS[s] }))),
+      )}
+      ${select("contact_id", "Project contact", p.contact_id || "",
+        [{ value: "", label: contacts.length ? "— use client's primary contact" : "no contacts on this client" },
+         ...contacts.map((c) => ({ value: c.id, label: c.title ? `${c.name} — ${c.title}` : c.name }))])}
+      ${row(
         field("hourly_rate", "Hourly rate override", p.hourly_rate, { type: "number", step: "0.01", min: 0, hint: "Blank = client/default rate" }),
+        field("budget", "Budget", p.budget, { type: "number", step: "0.01", min: 0 }),
       )}
       ${row(
         field("start_date", "Start date", p.start_date, { type: "date" }),
         field("due_date", "Due date", p.due_date, { type: "date" }),
       )}
-      ${field("budget", "Budget", p.budget, { type: "number", step: "0.01", min: 0 })}
       ${textarea("description", "Description", p.description, { rows: 3 })}
     </form>`,
     onConfirm: async (dlg) => {
       const f = readForm(dlg.querySelector("form"));
-      const patch = {
+      return await updateProject(p.id, {
         title: f.title,
-        client_id: f.client_id,
         scope: f.scope,
         status: f.status,
+        contact_id: f.contact_id || null,
         hourly_rate: f.hourly_rate,
         start_date: f.start_date || null,
         due_date: f.due_date || null,
         budget: f.budget,
         description: f.description || null,
-      };
-      return isNew ? await createProject(patch) : await updateProject(p.id, patch);
+      });
     },
   });
 
-  if (result) {
-    toastOk(isNew ? "Project created" : "Project saved");
-    onSaved?.(result);
-  }
+  if (result) { toastOk("Project saved"); onSaved?.(result); }
 }

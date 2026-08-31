@@ -464,3 +464,12 @@ dialog.modal .m-foot { display: flex; justify-content: flex-end; gap: 10px; padd
 .sec-block:last-child { margin-bottom: 0; }
 .sec-block h3 { margin-bottom: 4px; }
 .sec-block textarea { background: var(--card-bg); }
+
+/* ---------- client contact rows in the edit modal ---------- */
+.contact-row {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  background: var(--bg-alt);
+}
+.contact-row input { background: var(--card-bg); }

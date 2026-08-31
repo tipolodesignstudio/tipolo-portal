@@ -55,6 +55,11 @@ export async function render(root, ctx) {
         <h2>Overview</h2>
         <dl class="kv">
           <dt>Client</dt><dd><a href="#/clients/${p.client?.id}">${escapeHtml(p.client?.name || "—")}</a></dd>
+          <dt>Contact</dt><dd>${(() => {
+            const ct = p.contact || (p.client?.contacts || []).find((x) => x.is_primary) || (p.client?.contacts || [])[0];
+            if (!ct) return "—";
+            return `${escapeHtml(ct.name)}${ct.title ? ` <span class="faint">· ${escapeHtml(ct.title)}</span>` : ""}${p.contact ? "" : ` <span class="faint">(client primary)</span>`}`;
+          })()}</dd>
           <dt>Scope</dt><dd>${escapeHtml(p.scope)}</dd>
           <dt>Status</dt><dd>${STATUS_LABELS[p.status] || p.status}</dd>
           <dt>Start</dt><dd>${p.start_date ? date(p.start_date) : "—"}</dd>

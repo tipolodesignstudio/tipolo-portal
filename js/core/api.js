@@ -59,37 +59,106 @@ export async function getMyProfile() {
   return data;
 }
 
+/* ---------------- client categories (managed list) ---------------- */
+
+export async function listCategories() {
+  return unwrap(await supabase.from("client_categories").select("*")
+    .order("sort_order").order("name"));
+}
+export async function createCategory(name) {
+  const { data: max } = await supabase.from("client_categories")
+    .select("sort_order").order("sort_order", { ascending: false }).limit(1).maybeSingle();
+  return unwrap(await supabase.from("client_categories")
+    .insert({ name: name.trim(), sort_order: (max?.sort_order ?? 0) + 1 }).select().single());
+}
+export async function updateCategory(id, patch) {
+  return unwrap(await supabase.from("client_categories").update(patch).eq("id", id).select().single());
+}
+export async function deleteCategory(id) {
+  // pull it from any client that carries it, then delete
+  const affected = unwrap(await supabase.from("clients").select("id, category_ids").contains("category_ids", [id]));
+  for (const c of affected) {
+    await supabase.from("clients").update({ category_ids: c.category_ids.filter((x) => x !== id) }).eq("id", c.id);
+  }
+  const { error } = await supabase.from("client_categories").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 /* ---------------- clients ---------------- */
 
-export async function listClients({ search = "", status = "active" } = {}) {
-  let q = supabase
-    .from("clients")
-    .select("*, projects(count)")
-    .order("name", { ascending: true });
+const CLIENT_SELECT =
+  "*, projects(count), contacts:client_contacts(id, name, title, email, phone, is_primary)";
+
+export async function listClients({ search = "", status = "active", categoryId = "" } = {}) {
+  let q = supabase.from("clients").select(CLIENT_SELECT).order("name", { ascending: true });
   if (status && status !== "all") q = q.eq("status", status);
+  if (categoryId) q = q.contains("category_ids", [categoryId]);
   if (search.trim()) {
     const s = `%${search.trim()}%`;
-    q = q.or(`name.ilike.${s},contact_name.ilike.${s},email.ilike.${s}`);
+    q = q.or(`name.ilike.${s},email.ilike.${s}`);
   }
   const rows = unwrap(await q);
-  return rows.map((r) => ({ ...r, project_count: r.projects?.[0]?.count ?? 0 }));
+  return rows.map((r) => ({
+    ...r,
+    project_count: r.projects?.[0]?.count ?? 0,
+    primary_contact: (r.contacts || []).find((c) => c.is_primary) || (r.contacts || [])[0] || null,
+  }));
 }
 
 export async function getClient(id) {
-  return unwrap(await supabase.from("clients").select("*").eq("id", id).single());
+  const row = unwrap(await supabase.from("clients").select(CLIENT_SELECT).eq("id", id).single());
+  row.primary_contact = (row.contacts || []).find((c) => c.is_primary) || (row.contacts || [])[0] || null;
+  return row;
 }
 
 export async function createClient(patch) {
   return unwrap(await supabase.from("clients").insert(patch).select().single());
 }
-
 export async function updateClient(id, patch) {
   return unwrap(await supabase.from("clients").update(patch).eq("id", id).select().single());
 }
 
+export async function listClientContacts(clientId) {
+  return unwrap(await supabase.from("client_contacts").select("*").eq("client_id", clientId)
+    .order("is_primary", { ascending: false }).order("created_at"));
+}
+
+// Reconcile a client's contacts against a form list. `rows` = [{id?, name, title, email, phone, is_primary}]
+export async function saveClientContacts(clientId, rows) {
+  const existing = unwrap(await supabase.from("client_contacts").select("id").eq("client_id", clientId));
+  const keepIds = new Set(rows.filter((r) => r.id).map((r) => r.id));
+  const toDelete = existing.filter((e) => !keepIds.has(e.id)).map((e) => e.id);
+  if (toDelete.length) {
+    const { error } = await supabase.from("client_contacts").delete().in("id", toDelete);
+    if (error) throw new Error(error.message);
+  }
+  let anyPrimary = rows.some((r) => r.is_primary);
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const payload = {
+      client_id: clientId,
+      name: r.name.trim(),
+      title: r.title?.trim() || null,
+      email: r.email?.trim() || null,
+      phone: r.phone?.trim() || null,
+      is_primary: anyPrimary ? !!r.is_primary : i === 0,
+    };
+    if (r.id) {
+      const { error } = await supabase.from("client_contacts").update(payload).eq("id", r.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("client_contacts").insert(payload);
+      if (error) throw new Error(error.message);
+    }
+  }
+}
+
 /* ---------------- projects ---------------- */
 
-const PROJECT_SELECT = "*, client:clients(id, name, contact_name, is_individual, default_rate)";
+const PROJECT_SELECT =
+  "*, client:clients(id, name, is_individual, default_rate, " +
+  "contacts:client_contacts(id, name, title, email, phone, is_primary)), " +
+  "contact:contact_id(id, name, title, email, phone)";
 
 export async function listProjects({ search = "", status = "", scope = "", clientId = "" } = {}) {
   let q = supabase.from("projects").select(PROJECT_SELECT).order("updated_at", { ascending: false });
@@ -113,6 +182,18 @@ export async function createProject(patch) {
 
 export async function updateProject(id, patch) {
   return unwrap(await supabase.from("projects").update(patch).eq("id", id).select(PROJECT_SELECT).single());
+}
+
+/* who an invoice/proposal is addressed to: project contact -> client primary contact */
+export function billingContact(project) {
+  if (!project) return null;
+  if (project.contact) return project.contact;
+  const cs = project.client?.contacts || [];
+  return cs.find((c) => c.is_primary) || cs[0] || null;
+}
+export function clientPrimaryContact(client) {
+  const cs = client?.contacts || [];
+  return cs.find((c) => c.is_primary) || cs[0] || null;
 }
 
 /* effective hourly rate: project override -> client default -> settings default */
@@ -250,8 +331,9 @@ export async function listActiveProjectsLite() {
 // One invoice = one project. Client is reached through the project.
 
 const INVOICE_SELECT =
-  "*, project:projects(id, number, title, scope, " +
-  "client:clients(id, name, contact_name, is_individual, email, street, city, province, postal_code))";
+  "*, project:projects(id, number, title, scope, contact:contact_id(name, title, email, phone), " +
+  "client:clients(id, name, is_individual, email, street, city, province, postal_code, " +
+  "contacts:client_contacts(name, title, email, phone, is_primary)))";
 
 export async function listInvoices({ status = "", projectId = "" } = {}) {
   let q = supabase.from("invoices").select(INVOICE_SELECT).order("issue_date", { ascending: false });
@@ -382,7 +464,8 @@ export async function deleteTemplate(id) {
 /* ---------------- proposals ---------------- */
 
 const PROPOSAL_SELECT =
-  "*, client:clients(id, name, contact_name, is_individual, email, street, city, province, postal_code), " +
+  "*, client:clients(id, name, is_individual, email, street, city, province, postal_code, " +
+  "contacts:client_contacts(name, title, email, phone, is_primary)), " +
   "converted_project:converted_project_id(id, number, status)";
 
 export async function listProposals({ status = "", clientId = "" } = {}) {

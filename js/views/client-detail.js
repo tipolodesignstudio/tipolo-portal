@@ -1,7 +1,7 @@
 // Client detail: contact card + this client's projects.
 import { escapeHtml, money, date, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getClient, listProjects, listProposals } from "../core/api.js";
+import { getClient, listProjects, listProposals, listCategories } from "../core/api.js";
 import { editClient } from "./clients.js";
 import { newProposalFlow } from "./proposals.js";
 
@@ -9,10 +9,11 @@ export async function render(root, ctx) {
   const id = ctx.params.id;
   root.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading…</div>`;
 
-  let client, projects, proposals;
+  let client, projects, proposals, categories;
   try {
-    [client, projects, proposals] = await Promise.all([
+    [client, projects, proposals, categories] = await Promise.all([
       getClient(id), listProjects({ clientId: id }), listProposals({ clientId: id }),
+      listCategories().catch(() => []),
     ]);
   } catch (err) {
     root.innerHTML = `<div class="empty"><h3>Client not found</h3>
@@ -21,6 +22,8 @@ export async function render(root, ctx) {
     return;
   }
   ctx.setCrumbs?.(`Clients / ${client.name}`);
+  const catById = Object.fromEntries((categories || []).map((c) => [c.id, c.name]));
+  const contacts = (client.contacts || []).slice().sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
 
   root.innerHTML = `
     <div class="page-head">
@@ -28,8 +31,10 @@ export async function render(root, ctx) {
         <div class="faint" style="font-size:.85rem"><a href="#/clients">← Clients</a></div>
         <h1>${escapeHtml(client.name)}
           ${client.status === "archived" ? `<span class="badge grey">archived</span>` : ""}</h1>
-        <div class="muted">${client.is_individual ? "Individual client"
-          : escapeHtml(client.contact_name || "")}</div>
+        <div class="muted">
+          ${client.is_individual ? "Individual client" : escapeHtml(client.primary_contact?.name || "")}
+          ${(client.category_ids || []).map((id) => `<span class="badge" style="margin-left:6px">${escapeHtml(catById[id] || "?")}</span>`).join("")}
+        </div>
       </div>
       <div class="cluster">
         <button class="btn ghost" data-edit-client>Edit client</button>
@@ -38,11 +43,25 @@ export async function render(root, ctx) {
     </div>
 
     <div class="card">
-      <h2>Contact</h2>
+      <h2>Contacts</h2>
+      ${contacts.length ? `
+        <div class="table-wrap"><table class="data">
+          <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th></tr></thead>
+          <tbody>
+            ${contacts.map((ct) => `
+              <tr>
+                <td>${escapeHtml(ct.name)}${ct.is_primary ? ` <span class="badge green">primary</span>` : ""}</td>
+                <td class="muted">${escapeHtml(ct.title || "—")}</td>
+                <td class="muted">${ct.email ? `<a href="mailto:${escapeHtml(ct.email)}">${escapeHtml(ct.email)}</a>` : "—"}</td>
+                <td class="muted">${escapeHtml(ct.phone || "—")}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table></div>` : `<p class="faint" style="font-size:.9rem">No contacts recorded.</p>`}
+    </div>
+
+    <div class="card">
+      <h2>Details</h2>
       <dl class="kv">
-        ${client.is_individual ? "" : `<dt>Contact person</dt><dd>${escapeHtml(client.contact_name || "—")}</dd>`}
-        <dt>Email</dt><dd>${client.email ? `<a href="mailto:${escapeHtml(client.email)}">${escapeHtml(client.email)}</a>` : "—"}</dd>
-        <dt>Phone</dt><dd>${escapeHtml(client.phone || "—")}</dd>
         <dt>Address</dt><dd style="white-space:pre-wrap">${escapeHtml(addressBlock(client)) || "—"}</dd>
         <dt>Default rate</dt><dd>${client.default_rate != null ? money(client.default_rate) + " / hr" : "—"}</dd>
         <dt>Tags</dt><dd>${(client.tags || []).map((t) => `<span class="badge">${escapeHtml(t)}</span>`).join(" ") || "—"}</dd>

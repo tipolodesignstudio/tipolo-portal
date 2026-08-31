@@ -3,9 +3,11 @@
 import { escapeHtml, money, num, date } from "../core/format.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { buildTokenMap, resolveSections } from "../core/tokens.js";
+import { clientPrimaryContact } from "../core/api.js";
 
 export function printProposal(p, settings = {}) {
   const c = p.client || {};
+  const contact = clientPrimaryContact(c);
   const map = buildTokenMap({ client: c, proposal: p, settings });
   const sections = resolveSections(p.sections, map);
   const subtotal = (p.line_items || []).reduce((s, li) => s + lineAmount(li), 0);
@@ -39,7 +41,7 @@ export function printProposal(p, settings = {}) {
         <div>
           <h4>Prepared for</h4>
           <div>${escapeHtml(c.name || "")}</div>
-          ${!c.is_individual && c.contact_name ? `<div>Attn: ${escapeHtml(c.contact_name)}</div>` : ""}
+          ${!c.is_individual && contact ? `<div>Attn: ${escapeHtml(contact.name)}${contact.title ? `, ${escapeHtml(contact.title)}` : ""}</div>` : ""}
           <div style="white-space:pre-line">${[c.street, c.city, [c.province, c.postal_code].filter(Boolean).join("  ")].filter(Boolean).map(escapeHtml).join("\n")}</div>
         </div>
         <div><h4>Project</h4><div>${escapeHtml(p.title || "")}</div><div>${escapeHtml(p.project_scope || "")}</div></div>

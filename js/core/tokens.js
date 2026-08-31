@@ -5,10 +5,12 @@ import { money, date, isoDate } from "./format.js";
 export function buildTokenMap({ client = {}, proposal = {}, settings = {} }) {
   const subtotal = (proposal.line_items || []).reduce(
     (s, li) => s + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
+  const contacts = client.contacts || [];
+  const primary = contacts.find((c) => c.is_primary) || contacts[0] || null;
   return {
     "client.name": client.name || "",
-    "client.contact": client.is_individual ? client.name : (client.contact_name || ""),
-    "client.email": client.email || "",
+    "client.contact": client.is_individual ? client.name : (primary?.name || ""),
+    "client.email": primary?.email || client.email || "",
     "project.title": proposal.title || "",
     "project.scope": proposal.project_scope || "",
     "proposal.number": proposal.number || "",

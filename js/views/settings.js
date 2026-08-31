@@ -1,7 +1,11 @@
-// Settings: business identity, tax lines, invoice numbering, default rate, terms, logo.
+// Settings: business identity, tax lines, numbering, client categories, terms, logo.
 import { escapeHtml, setCurrency } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getSettings, saveSettings, uploadLogo } from "../core/api.js";
+import {
+  getSettings, saveSettings, uploadLogo,
+  listCategories, createCategory, updateCategory, deleteCategory,
+} from "../core/api.js";
+import { confirmModal } from "../components/modal.js";
 import { toastOk, toastErr } from "../components/toast.js";
 
 let taxLines = [];
@@ -84,6 +88,16 @@ export async function render(root, ctx) {
       </div>
 
       <div class="card">
+        <h2>Client categories</h2>
+        <div class="muted" style="margin-bottom:10px">Assignable on each client and filterable on the Clients list.</div>
+        <div id="cat-list" class="stack" style="gap:8px"></div>
+        <form class="cluster" id="cat-add" style="margin-top:10px">
+          <input type="text" name="name" placeholder="New category…" style="max-width:220px" />
+          <button class="btn subtle sm" type="submit">Add category</button>
+        </form>
+      </div>
+
+      <div class="card">
         <h2>Boilerplate</h2>
         <div class="form-grid">
           ${textarea("payment_terms", "Invoice payment terms", s.payment_terms, 3)}
@@ -98,6 +112,7 @@ export async function render(root, ctx) {
     </form>`;
 
   renderTaxRows(root);
+  wireCategories(root);
 
   on(root, "click", "#tax-add", () => {
     taxLines.push({ label: "", rate: 0, enabled: true });
@@ -166,6 +181,49 @@ export async function render(root, ctx) {
       toastErr("Save failed: " + err.message);
     } finally { btn.disabled = false; }
   });
+}
+
+async function wireCategories(root) {
+  const host = root.querySelector("#cat-list");
+  if (!host) return;
+
+  async function refresh() {
+    let cats = [];
+    try { cats = await listCategories(); }
+    catch (err) { host.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`; return; }
+    host.innerHTML = cats.length ? cats.map((c) => `
+      <div class="cluster" data-cat="${c.id}" style="gap:8px">
+        <input value="${escapeHtml(c.name)}" data-cat-name style="max-width:220px" />
+        <button type="button" class="btn ghost sm" data-cat-save>Rename</button>
+        <button type="button" class="btn link" data-cat-del>delete</button>
+      </div>`).join("")
+      : `<p class="faint" style="font-size:.9rem">No categories.</p>`;
+  }
+
+  on(root, "click", "[data-cat-save]", async (e, btn) => {
+    const wrap = btn.closest("[data-cat]");
+    const name = wrap.querySelector("[data-cat-name]").value.trim();
+    if (!name) return;
+    try { await updateCategory(wrap.dataset.cat, { name }); toastOk("Renamed"); refresh(); }
+    catch (err) { toastErr(err.message); }
+  });
+  on(root, "click", "[data-cat-del]", async (e, btn) => {
+    const ok = await confirmModal("Delete this category? It's removed from any clients that have it.",
+      { title: "Delete category", confirmText: "Delete" });
+    if (!ok) return;
+    try { await deleteCategory(btn.closest("[data-cat]").dataset.cat); toastOk("Deleted"); refresh(); }
+    catch (err) { toastErr(err.message); }
+  });
+  root.querySelector("#cat-add").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = e.target.elements.name;
+    const name = input.value.trim();
+    if (!name) return;
+    try { await createCategory(name); input.value = ""; toastOk("Category added"); refresh(); }
+    catch (err) { toastErr(err.message); }
+  });
+
+  await refresh();
 }
 
 function renderTaxRows(root) {

@@ -68,8 +68,8 @@ create trigger app_settings_set_updated_at
 create table if not exists public.clients (
   id            uuid primary key default gen_random_uuid(),
   name          text not null,                    -- client / business name (primary identity)
-  contact_name  text,                             -- individual to deal with
-  is_individual boolean not null default false,   -- true => name mirrors contact_name
+  is_individual boolean not null default false,   -- true => single contact = the person
+  category_ids  uuid[] not null default '{}',     -- -> client_categories
   email         text,
   phone         text,
   street        text,
