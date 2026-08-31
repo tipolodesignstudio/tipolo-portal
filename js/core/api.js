@@ -583,9 +583,14 @@ export async function uploadReceipt(file) {
 
 export async function receiptUrl(pathOrUrl) {
   if (!pathOrUrl) return null;
-  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;   // legacy public URL
-  const { data, error } = await supabase.storage.from("receipts")
-    .createSignedUrl(pathOrUrl, 3600);
+  // accept a bare path, or any full Supabase storage URL (legacy public/signed) and
+  // pull the object path out of it, then mint a fresh signed URL.
+  let path = String(pathOrUrl);
+  const m = path.match(/\/object\/(?:public|sign|authenticated)\/receipts\/([^?]+)/);
+  if (m) path = decodeURIComponent(m[1]);
+  else if (/^https?:\/\//.test(path)) return pathOrUrl; // unknown external URL — leave it
+
+  const { data, error } = await supabase.storage.from("receipts").createSignedUrl(path, 3600);
   if (error) throw new Error(error.message);
   return data.signedUrl;
 }
@@ -672,11 +677,20 @@ export async function convertProposal(proposal, { status = "lead", start_date = 
 /* ---------------- storage (branding logo) ---------------- */
 
 export async function uploadLogo(file) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Your session has expired — sign out and back in, then retry.");
+
   const ext = (file.name.split(".").pop() || "png").toLowerCase();
-  const path = `logo-${Date.now()}.${ext}`;
+  const path = `logo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
   const { error } = await supabase.storage
-    .from("branding").upload(path, file, { upsert: true, cacheControl: "3600" });
-  if (error) throw new Error(error.message);
+    .from("branding").upload(path, file, { cacheControl: "3600" });
+  if (error) {
+    if (/row-level security|Unauthorized|AccessDenied/i.test(error.message)) {
+      throw new Error("Storage denied the upload — sign out and back in, then retry. " +
+        "If it persists, check the `branding` bucket exists and 0015 has run.");
+    }
+    throw new Error(error.message);
+  }
   const { data } = supabase.storage.from("branding").getPublicUrl(path);
   return data.publicUrl;
 }
