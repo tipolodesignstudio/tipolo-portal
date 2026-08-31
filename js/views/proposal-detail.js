@@ -57,7 +57,11 @@ export async function render(root, ctx) {
         ${field("title", "Project title", p.title, { required: true })}
         ${select("project_scope", "Scope", p.project_scope,
           ["landscape", "multimedia", "other"].map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) })))}
-        ${field("valid_until", "Valid until", p.valid_until, { type: "date" })}
+        <div class="field">
+          <label class="lbl">Valid until</label>
+          <div class="input" style="background:var(--bg-alt)">${p.valid_until ? date(p.valid_until)
+            : `<span class="faint">set to 1 year after “sent”</span>`}</div>
+        </div>
       </div>
       ${editable ? `<div class="hint" style="margin-top:8px">Tokens you can use in section text:
         ${TOKEN_HELP.map((t) => `<code>${escapeHtml(t)}</code>`).join(" ")}</div>` : ""}
@@ -142,7 +146,6 @@ export async function render(root, ctx) {
     return updateProposal(p.id, {
       title: root.querySelector("[name=title]").value.trim() || p.title,
       project_scope: root.querySelector("[name=project_scope]").value,
-      valid_until: root.querySelector("[name=valid_until]").value || null,
       sections,
       line_items: items,
       subtotal: Math.round(subtotal() * 100) / 100,

@@ -1,10 +1,10 @@
 // Clients — a CRM view. Each client has one category and a notes timeline; the list
-// lets you edit the current note inline and Commit, which date-stamps a new entry and
-// keeps the previous one in the client's history.
+// lets you edit the current note inline and Save it per row, which date-stamps a new
+// entry and keeps the previous one in the client's history.
 import { escapeHtml, debounce, money, relTime } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
-  listClients, getClient, createClient, updateClient, commitClientNotes,
+  listClients, getClient, createClient, updateClient, addClientNote,
   listClientContacts, saveClientContacts, listCategories,
 } from "../core/api.js";
 import { openModal } from "../components/modal.js";
@@ -13,20 +13,15 @@ import { toastOk, toastErr } from "../components/toast.js";
 
 let state = { search: "", status: "active", categoryId: "" };
 let categories = [];
-let pendingNotes = new Map();   // clientId -> edited body (differs from original)
 
 export async function render(root, ctx) {
   ctx.setCrumbs?.("Clients");
-  pendingNotes = new Map();
   try { categories = await listCategories(); } catch { categories = []; }
 
   root.innerHTML = `
     <div class="page-head">
-      <div><h1>Clients</h1><div class="muted">Your CRM — categories and a running notes history per client.</div></div>
-      <div class="cluster">
-        <button class="btn" data-commit disabled>Commit notes</button>
-        <button class="btn ghost" data-new-client>+ New client</button>
-      </div>
+      <div><h1>Clients</h1><div class="muted">Your CRM — category and a running notes history per client.</div></div>
+      <button class="btn" data-new-client>+ New client</button>
     </div>
     <div class="filters">
       <input class="search" type="search" placeholder="Search client or email…"
@@ -43,14 +38,8 @@ export async function render(root, ctx) {
     <div id="clients-list"><div class="loading-row"><span class="spinner"></span> Loading…</div></div>`;
 
   const listEl = root.querySelector("#clients-list");
-  const commitBtn = root.querySelector("[data-commit]");
-  const syncCommit = () => {
-    commitBtn.disabled = pendingNotes.size === 0;
-    commitBtn.textContent = pendingNotes.size ? `Commit notes (${pendingNotes.size})` : "Commit notes";
-  };
 
   async function refresh() {
-    pendingNotes.clear(); syncCommit();
     listEl.innerHTML = `<div class="loading-row"><span class="spinner"></span> Loading…</div>`;
     try {
       const rows = await listClients(state);
@@ -78,23 +67,27 @@ export async function render(root, ctx) {
     ctx.navigate(`/clients/${tr.dataset.id}`);
   });
 
+  // per-row inline notes: enable the row's Save button once the text changes
   on(root, "input", "textarea[data-note-for]", (e, el) => {
-    const id = el.dataset.noteFor;
-    const original = el.dataset.original || "";
-    if (el.value.trim() === original.trim()) pendingNotes.delete(id);
-    else pendingNotes.set(id, el.value);
-    syncCommit();
+    const cell = el.closest("td");
+    const btn = cell.querySelector("[data-save-note]");
+    const changed = el.value.trim() !== (el.dataset.original || "").trim() && el.value.trim() !== "";
+    btn.disabled = !changed;
   });
-
-  commitBtn.addEventListener("click", async () => {
-    if (!pendingNotes.size) return;
-    commitBtn.disabled = true;
-    const changes = [...pendingNotes.entries()].map(([clientId, body]) => ({ clientId, body }));
+  on(root, "click", "[data-save-note]", async (e, btn) => {
+    const cell = btn.closest("td");
+    const ta = cell.querySelector("textarea[data-note-for]");
+    const body = ta.value.trim();
+    if (!body) return;
+    btn.disabled = true; btn.textContent = "Saving…";
     try {
-      const n = await commitClientNotes(changes);
-      toastOk(`${n} note${n === 1 ? "" : "s"} saved to history`);
-      refresh();
-    } catch (err) { toastErr(err.message); commitBtn.disabled = false; }
+      await addClientNote(ta.dataset.noteFor, body);
+      ta.dataset.original = body;
+      btn.textContent = "Saved ✓";
+      cell.querySelector("[data-note-meta]").textContent = "last noted just now";
+      setTimeout(() => { btn.textContent = "Save"; }, 1800);
+      toastOk("Note saved to history");
+    } catch (err) { toastErr(err.message); btn.disabled = false; btn.textContent = "Save"; }
   });
 
   await refresh();
@@ -105,10 +98,10 @@ function table(rows) {
     <div class="table-wrap">
       <table class="data crm">
         <thead><tr>
-          <th style="width:22%">Client</th>
+          <th style="width:24%">Client</th>
           <th style="width:130px">Category</th>
-          <th>Notes <span class="faint" style="font-weight:400">— edit and Commit</span></th>
-          <th></th>
+          <th>Notes</th>
+          <th style="width:60px"></th>
         </tr></thead>
         <tbody>
           ${rows.map((c) => `
@@ -116,16 +109,20 @@ function table(rows) {
               <td>
                 <div>${escapeHtml(c.name)}${c.status === "archived" ? ` <span class="badge grey">archived</span>` : ""}</div>
                 <div class="faint" style="font-size:.8rem">${c.is_individual ? "individual"
-                  : escapeHtml(c.primary_contact?.name || "no contact")}</div>
+                  : escapeHtml(c.primary_contact?.name || "no contact")}
+                  · <button class="btn link" data-edit style="font-size:.8rem">edit</button></div>
               </td>
               <td class="muted">${c.category ? `<span class="badge">${escapeHtml(c.category.name)}</span>` : "—"}</td>
               <td>
-                <textarea data-note-for="${c.id}" data-original="${escapeHtml(c.latest_note || "")}"
-                  rows="2" placeholder="Add a note…">${escapeHtml(c.latest_note || "")}</textarea>
-                <div class="faint" style="font-size:.75rem;margin-top:2px">
+                <div class="note-cell">
+                  <textarea data-note-for="${c.id}" data-original="${escapeHtml(c.latest_note || "")}"
+                    rows="2" placeholder="Add a note…">${escapeHtml(c.latest_note || "")}</textarea>
+                  <button class="btn sm" data-save-note disabled>Save</button>
+                </div>
+                <div class="faint" data-note-meta style="font-size:.75rem;margin-top:2px">
                   ${c.latest_note_at ? `last noted ${relTime(c.latest_note_at)}` : "no notes yet"}</div>
               </td>
-              <td class="right"><button class="btn link" data-edit>Edit</button></td>
+              <td class="right"><a class="btn link" href="#/clients/${c.id}">open</a></td>
             </tr>`).join("")}
         </tbody>
       </table>

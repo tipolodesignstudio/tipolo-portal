@@ -117,7 +117,7 @@ export async function newProposalFlow(ctx, presetClientId = "") {
       ${select("template_id", "Template", "",
         [{ value: "", label: "None — blank proposal" },
          ...templates.map((t) => ({ value: t.id, label: t.name }))])}
-      ${field("valid_until", "Valid until", "", { type: "date" })}
+      <div class="hint">The proposal is valid for 1 year from the day you mark it “sent”.</div>
     </form>`,
     onConfirm: async (dlg) => {
       const f = new FormData(dlg.querySelector("form"));
@@ -131,7 +131,7 @@ export async function newProposalFlow(ctx, presetClientId = "") {
         const tpl = await getTemplate(templateId);
         const draft = {
           title: f.get("title"), project_scope: f.get("project_scope"),
-          valid_until: f.get("valid_until") || null, line_items: tpl.default_line_items || [],
+          line_items: tpl.default_line_items || [],
         };
         const map = buildTokenMap({ client, proposal: draft, settings });
         sections = resolveSections(tpl.sections, map);
@@ -144,7 +144,6 @@ export async function newProposalFlow(ctx, presetClientId = "") {
         client_id: clientId,
         title: f.get("title"),
         project_scope: f.get("project_scope"),
-        valid_until: f.get("valid_until") || null,
         sections,
         line_items: lineItems,
         subtotal: Math.round(subtotal * 100) / 100,

@@ -9,6 +9,11 @@ function addDaysIso(iso, days) {
   d.setDate(d.getDate() + days);
   return isoDate(d);
 }
+function addYearsIso(iso, years) {
+  const d = new Date(iso + "T00:00:00");
+  d.setFullYear(d.getFullYear() + years);
+  return isoDate(d);
+}
 
 function unwrap({ data, error }) {
   if (error) {
@@ -513,7 +518,10 @@ export async function deleteProposal(id) {
 }
 export async function setProposalStatus(id, status) {
   const patch = { status };
-  if (status === "sent") patch.sent_date = isoToday();
+  if (status === "sent") {
+    patch.sent_date = isoToday();
+    patch.valid_until = addYearsIso(isoToday(), 1);   // valid 1 year from the send date
+  }
   if (status === "accepted" || status === "declined") patch.decided_date = isoToday();
   return updateProposal(id, patch);
 }
