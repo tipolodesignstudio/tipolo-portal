@@ -5,7 +5,7 @@ import { on } from "../core/render.js";
 import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices, listProjectProposals, listProjectExpenses } from "../core/api.js";
 import { editProject } from "./projects.js";
 import { editTimeEntry, confirmDeleteEntry } from "./time-entry-modal.js";
-import { editExpense } from "./expenses.js";
+import { editExpense, openReceipt } from "./expenses.js";
 import { newInvoiceFlow, effectiveStatus } from "./invoices.js";
 import { toastErr } from "../components/toast.js";
 
@@ -212,7 +212,7 @@ async function renderExpensesTab(pane, project, ctx) {
           ${rows.map((e) => `
             <tr>
               <td class="nowrap">${date(e.expense_date)}</td>
-              <td>${escapeHtml(e.vendor || "—")}${e.receipt_url ? ` <a href="${escapeHtml(e.receipt_url)}" target="_blank" rel="noopener">🧾</a>` : ""}</td>
+              <td>${escapeHtml(e.vendor || "—")}${e.receipt_url ? ` <button class="btn link" data-receipt="${escapeHtml(e.receipt_url)}" title="View receipt">🧾</button>` : ""}</td>
               <td class="muted">${escapeHtml(e.category?.name || "—")}</td>
               <td class="num">${money(e.amount)}</td>
               <td>${e.billable ? (e.invoice_id ? `<span class="badge green">billed</span>`
@@ -230,6 +230,7 @@ async function renderExpensesTab(pane, project, ctx) {
     const ex = map.get(el.dataset.editExp);
     if (ex) editExpense(ex, reload);
   });
+  on(pane, "click", "[data-receipt]", (e, el) => openReceipt(el.dataset.receipt));
 }
 
 async function renderInvoicesTab(pane, project, ctx) {

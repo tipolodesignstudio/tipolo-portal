@@ -37,6 +37,7 @@ That one file bundles every migration:
 | `0012_contacts_categories.sql` | Multiple contacts per client; managed client categories; project contact override |
 | `0013_client_notes_category.sql` | One category per client; notes become a dated timeline (CRM) |
 | `0014_expenses.sql` | Expenses + expense categories (Phase 5) |
+| `0015_storage_policies.sql` | Storage access — private `receipts`, authenticated writes |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
@@ -63,9 +64,11 @@ SMTP Settings, and plug in any SMTP provider.)*
 
 **Storage → New bucket** (twice):
 - `branding` — **Public: on** — logo upload in Settings.
-- `receipts` — **Public: on** — expense receipt uploads.
+- `receipts` — **Public: OFF (private)** — expense receipts. The app serves each one
+  through a short-lived signed link, so only logged-in users can open them.
 
-Both optional. "Public" means anyone with the exact (random) file URL can open it.
+Access is granted by `0015_storage_policies.sql` (part of `schema.sql`). If you already
+made `receipts` public, flip it to private in the bucket settings.
 
 ## 5. Point the app at your project
 

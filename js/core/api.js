@@ -561,13 +561,23 @@ export async function buildExpenseLineItems(projectId) {
   };
 }
 
+// Returns the storage PATH (not a URL). receipts is a private bucket — call
+// receiptUrl(path) to get a short-lived signed URL when you need to open one.
 export async function uploadReceipt(file) {
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
   const path = `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage.from("receipts").upload(path, file, { upsert: false });
   if (error) throw new Error(error.message);
-  const { data } = supabase.storage.from("receipts").getPublicUrl(path);
-  return data.publicUrl;
+  return path;
+}
+
+export async function receiptUrl(pathOrUrl) {
+  if (!pathOrUrl) return null;
+  if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;   // legacy public URL
+  const { data, error } = await supabase.storage.from("receipts")
+    .createSignedUrl(pathOrUrl, 3600);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
 }
 
 /* ---------------- proposal templates ---------------- */

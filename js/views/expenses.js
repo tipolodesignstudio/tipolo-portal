@@ -4,7 +4,7 @@ import { escapeHtml, money, date, isoDate, debounce } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
   listExpenses, createExpense, updateExpense, deleteExpense,
-  listExpenseCategories, listProjectsForInvoicing, uploadReceipt,
+  listExpenseCategories, listProjectsForInvoicing, uploadReceipt, receiptUrl,
 } from "../core/api.js";
 import { openModal, confirmModal } from "../components/modal.js";
 import { field, textarea, select, row, readForm, nullIfEmpty } from "../components/form.js";
@@ -65,6 +65,7 @@ export async function render(root, ctx) {
   }
 
   on(root, "change", "[data-f]", (e) => { state[e.target.dataset.f] = e.target.value; refresh(); });
+  on(root, "click", "[data-receipt]", async (e, el) => openReceipt(el.dataset.receipt));
   on(root, "click", "[data-new]", () => editExpense(null, refresh));
   on(root, "click", "[data-edit-exp]", (e, el) => editExpense(el.dataset.editExp, refresh));
   on(root, "click", "[data-del-exp]", async (e, el) => {
@@ -94,7 +95,7 @@ function table(rows) {
             <tr>
               <td class="nowrap">${date(e.expense_date)}</td>
               <td>${escapeHtml(e.vendor || "—")}
-                ${e.receipt_url ? ` <a href="${escapeHtml(e.receipt_url)}" target="_blank" rel="noopener" title="Receipt">🧾</a>` : ""}</td>
+                ${e.receipt_url ? ` <button class="btn link" data-receipt="${escapeHtml(e.receipt_url)}" title="View receipt">🧾</button>` : ""}</td>
               <td class="muted">${escapeHtml(e.category?.name || "—")}</td>
               <td class="muted">${e.project ? escapeHtml((e.project.number ? e.project.number + " · " : "") + e.project.title) : "—"}</td>
               <td class="num">${money(e.amount)}</td>
@@ -124,6 +125,18 @@ function empty() {
     <p class="faint">Log a cost — attach a receipt, tie it to a project, mark it billable.</p></div>`;
 }
 
+// open a receipt via a fresh signed URL (private bucket)
+export async function openReceipt(pathOrUrl) {
+  const w = window.open("", "_blank");           // open synchronously to dodge popup blockers
+  try {
+    const url = await receiptUrl(pathOrUrl);
+    if (w) w.location = url; else window.location.href = url;
+  } catch (err) {
+    if (w) w.close();
+    toastErr("Couldn't open receipt: " + err.message);
+  }
+}
+
 /* ---- create / edit ---- */
 export async function editExpense(existing, onSaved) {
   let e = {};
@@ -137,7 +150,7 @@ export async function editExpense(existing, onSaved) {
   if (!categories.length) { try { categories = await listExpenseCategories(); } catch { /* */ } }
   if (!projects.length) { try { projects = await listProjectsForInvoicing(); } catch { /* */ } }
 
-  let receiptUrl = e.receipt_url || "";
+  let receiptPath = e.receipt_url || "";   // storage path (private bucket)
 
   const result = await openModal({
     title: isNew ? "New expense" : "Edit expense",
@@ -171,21 +184,26 @@ export async function editExpense(existing, onSaved) {
         <label class="lbl">Receipt</label>
         <div class="cluster">
           <label class="btn subtle sm">Upload<input type="file" id="rcpt" accept="image/*,application/pdf" hidden /></label>
-          <span id="rcpt-state" class="faint" style="font-size:.85rem">${receiptUrl ? `<a href="${escapeHtml(receiptUrl)}" target="_blank" rel="noopener">current receipt</a>` : "none"}</span>
+          <span id="rcpt-state" class="faint" style="font-size:.85rem">${receiptPath
+            ? `<button type="button" class="btn link" id="rcpt-view">view current receipt</button>` : "none"}</span>
         </div>
-        <div class="hint">Needs a Storage bucket named <code>receipts</code> (see SETUP.md).</div>
+        <div class="hint">Stored privately — opens via a temporary link.</div>
       </div>
       ${!isNew && e.invoice_id ? `<div class="alert info">This expense is on an invoice.</div>` : ""}
     </form>`,
     onOpen: (dlg) => {
       const fileInput = dlg.querySelector("#rcpt");
       const stateEl = dlg.querySelector("#rcpt-state");
+      dlg.querySelector("#rcpt-view")?.addEventListener("click", () => openReceipt(receiptPath));
       fileInput.addEventListener("change", async () => {
         const file = fileInput.files[0];
         if (!file) return;
         stateEl.textContent = "uploading…";
-        try { receiptUrl = await uploadReceipt(file); stateEl.innerHTML = `<a href="${escapeHtml(receiptUrl)}" target="_blank" rel="noopener">receipt uploaded ✓</a>`; }
-        catch (err) { stateEl.textContent = "upload failed: " + err.message; }
+        try {
+          receiptPath = await uploadReceipt(file);
+          stateEl.innerHTML = `<button type="button" class="btn link" id="rcpt-view">receipt uploaded ✓ — view</button>`;
+          stateEl.querySelector("#rcpt-view").addEventListener("click", () => openReceipt(receiptPath));
+        } catch (err) { stateEl.textContent = "upload failed: " + err.message; }
       });
     },
     onConfirm: async (dlg) => {
@@ -202,7 +220,7 @@ export async function editExpense(existing, onSaved) {
         markup_pct: f.markup_pct ? Number(f.markup_pct) : 0,
         payment_method: nullIfEmpty(f.payment_method),
         notes: nullIfEmpty(f.notes),
-        receipt_url: receiptUrl || null,
+        receipt_url: receiptPath || null,
       };
       return isNew ? await createExpense(patch) : await updateExpense(e.id, patch);
     },
