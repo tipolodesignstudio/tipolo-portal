@@ -1,5 +1,5 @@
 // Field builders for modal forms. Each returns an HTML string; wrap them in <form>.
-import { escapeHtml } from "../core/format.js";
+import { escapeHtml, formatPhone } from "../core/format.js";
 
 export function field(name, label, value = "", { type = "text", ph = "", required = false,
                                                  step, min, hint } = {}) {
@@ -53,3 +53,12 @@ export function readForm(form) {
 }
 
 export const nullIfEmpty = (v) => (v === "" || v == null ? null : v);
+
+// Live phone formatting: rewrites the input to "+1.604.555.0123" as digits are typed.
+export function attachPhoneFormat(input) {
+  if (!input) return;
+  const apply = () => { input.value = formatPhone(input.value); };
+  apply();
+  input.addEventListener("input", apply);
+  input.addEventListener("blur", apply);
+}

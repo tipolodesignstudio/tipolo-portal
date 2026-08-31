@@ -41,7 +41,7 @@ export async function render(root, ctx) {
         ${client.is_individual ? "" : `<dt>Contact</dt><dd>${escapeHtml(client.contact_name || "—")}</dd>`}
         <dt>Email</dt><dd>${client.email ? `<a href="mailto:${escapeHtml(client.email)}">${escapeHtml(client.email)}</a>` : "—"}</dd>
         <dt>Phone</dt><dd>${escapeHtml(client.phone || "—")}</dd>
-        <dt>Address</dt><dd style="white-space:pre-wrap">${escapeHtml(client.address || "—")}</dd>
+        <dt>Address</dt><dd style="white-space:pre-wrap">${escapeHtml(addressBlock(client)) || "—"}</dd>
         <dt>Default rate</dt><dd>${client.default_rate != null ? money(client.default_rate) + " / hr" : "—"}</dd>
         <dt>Tags</dt><dd>${(client.tags || []).map((t) => `<span class="badge">${escapeHtml(t)}</span>`).join(" ") || "—"}</dd>
         <dt>Notes</dt><dd style="white-space:pre-wrap">${escapeHtml(client.notes || "—")}</dd>
@@ -58,6 +58,11 @@ export async function render(root, ctx) {
   on(root, "click", "[data-new-project]", () =>
     editProject({ client_id: client.id }, () => ctx.navigate(ctx.path)));
   on(root, "click", "tr[data-pid]", (e, tr) => ctx.navigate(`/projects/${tr.dataset.pid}`));
+}
+
+function addressBlock(c) {
+  const region = [c.province, c.postal_code].filter(Boolean).join("  ");
+  return [c.street, c.city, region].filter(Boolean).join("\n");
 }
 
 function projectList(projects) {

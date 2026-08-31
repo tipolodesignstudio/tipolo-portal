@@ -67,6 +67,21 @@ export function parseDuration(input) {
   return null;
 }
 
+// Phone display: "+1.604.555.0123". Default country code +1 (Canada/US). Formats
+// progressively while typing and returns "" for no national digits.
+// The displayed value already carries the "+1" prefix, and NANP national numbers never
+// start with 1, so a single leading 1 is always the country code and is dropped.
+export function formatPhone(input, cc = "1") {
+  let digits = String(input ?? "").replace(/\D/g, "");
+  if (digits.startsWith(cc)) digits = digits.slice(cc.length);
+  digits = digits.slice(0, 10);
+  if (!digits) return "";
+  const parts = [`+${cc}`, digits.slice(0, 3)];
+  if (digits.length > 3) parts.push(digits.slice(3, 6));
+  if (digits.length > 6) parts.push(digits.slice(6, 10));
+  return parts.join(".");
+}
+
 export function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",

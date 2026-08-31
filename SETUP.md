@@ -18,7 +18,7 @@ automated. Budget ~30 minutes. After this, day-to-day use is just opening
 In the project: **SQL Editor** → **+ New query**. Open **`supabase/schema.sql`**, paste
 the whole thing, click **Run**. It should say *Success*. (It's safe to re-run.)
 
-That one file bundles all six migrations:
+That one file bundles every migration:
 
 | File | What it does |
 |------|--------------|
@@ -30,6 +30,7 @@ That one file bundles all six migrations:
 | `0005_seed_settings.sql` | Creates the settings row with BC tax lines (GST 5% + PST 7%) |
 | `0006_time_entries.sql` | Timesheet entries table (Phase 2) |
 | `0007_clients_contact.sql` | Client = business name; adds `contact_name` + `is_individual` |
+| `0008_client_address.sql` | Structured address: street / city / province / postal_code |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
@@ -117,7 +118,11 @@ Open `https://portal.tipolo.ca` → the sign-in screen loads over HTTPS → sign
 
 ---
 
-## Adding a staff member later
-They just go to `portal.tipolo.ca`, click **Create an account** with their `@tipolo.ca`
-email, and confirm. No admin step needed. To remove someone: Supabase →
-**Authentication → Users → … → Delete user**.
+## Adding a staff member
+Until a custom SMTP sender is configured (Authentication → Emails → SMTP Settings), the
+built-in mailer is rate-limited and self-signup confirmation emails may not arrive. Add
+people directly: Supabase → **Authentication → Users → Add user → Create new user**,
+enter their `@tipolo.ca` email + a temp password, tick **Auto Confirm User**. They sign
+in and can change their password later.
+
+To remove someone: **Authentication → Users → … → Delete user**.

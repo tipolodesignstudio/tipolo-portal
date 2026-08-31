@@ -73,7 +73,10 @@ create table if not exists public.clients (
   is_individual boolean not null default false,   -- true => name mirrors contact_name
   email         text,
   phone         text,
-  address       text,
+  street        text,
+  city          text,
+  province      text,
+  postal_code   text,
   notes         text,
   default_rate  numeric(10,2),
   tags          text[] not null default '{}',

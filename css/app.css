@@ -314,6 +314,11 @@ table.data td.num, table.data th.num { text-align: right; font-variant-numeric: 
 /* ---------- dialog / modal ---------- */
 dialog.modal {
   width: min(560px, calc(100vw - 32px));
+  /* the global `* { margin: 0 }` reset kills the UA stylesheet's centering — restore it */
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: calc(100vh - 48px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0;

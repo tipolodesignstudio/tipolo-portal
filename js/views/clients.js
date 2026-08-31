@@ -5,7 +5,7 @@ import { escapeHtml, debounce, money } from "../core/format.js";
 import { on } from "../core/render.js";
 import { listClients, createClient, updateClient, getClient } from "../core/api.js";
 import { openModal } from "../components/modal.js";
-import { field, textarea, row, readForm, nullIfEmpty } from "../components/form.js";
+import { field, textarea, row, readForm, nullIfEmpty, attachPhoneFormat } from "../components/form.js";
 import { toastOk, toastErr } from "../components/toast.js";
 
 let state = { search: "", status: "active" };
@@ -112,10 +112,15 @@ export async function editClient(existing, onSaved, fetchFirst = false) {
         { hint: "The individual you deal with" })}
       ${row(
         field("email", "Email", c.email, { type: "email" }),
-        field("phone", "Phone", c.phone),
+        field("phone", "Phone", c.phone, { type: "tel", ph: "+1.604.555.0123" }),
       )}
       ${field("default_rate", "Default hourly rate", c.default_rate, { type: "number", step: "0.01", min: 0 })}
-      ${textarea("address", "Address", c.address, { rows: 2 })}
+      ${field("street", "Street", c.street)}
+      ${row(
+        field("city", "City", c.city),
+        field("province", "Province", c.province, { ph: "BC" }),
+      )}
+      ${field("postal_code", "Postal code", c.postal_code, { ph: "V8W 1A1" })}
       ${textarea("notes", "Notes", c.notes, { rows: 3 })}
       ${field("tags", "Tags", (c.tags || []).join(", "), { hint: "Comma-separated" })}
       ${!isNew ? `<label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
@@ -137,6 +142,7 @@ export async function editClient(existing, onSaved, fetchFirst = false) {
       };
       indiv.addEventListener("change", sync);
       sync();
+      attachPhoneFormat(form.elements.phone);
     },
     onConfirm: async (dlg) => {
       const f = readForm(dlg.querySelector("form"));
@@ -149,7 +155,10 @@ export async function editClient(existing, onSaved, fetchFirst = false) {
         is_individual: individual,
         email: nullIfEmpty(f.email),
         phone: nullIfEmpty(f.phone),
-        address: nullIfEmpty(f.address),
+        street: nullIfEmpty(f.street),
+        city: nullIfEmpty(f.city),
+        province: nullIfEmpty(f.province),
+        postal_code: nullIfEmpty(f.postal_code),
         notes: nullIfEmpty(f.notes),
         default_rate: f.default_rate,
         tags: (f.tags || "").split(",").map((t) => t.trim()).filter(Boolean),
