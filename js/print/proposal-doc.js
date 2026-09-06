@@ -247,9 +247,10 @@ export function proposalDocHtml(p, settings = {}) {
     <p class="re">RE: ${esc((p.title || "").toUpperCase())}</p>
     ${cover.map(([b, i]) => prose(b.body, map, ` data-blk="${i}"`)).join("")}
     <p class="closing">Sincerely,</p>
-    <div class="sig-slot">${settings.signature_url
-      ? `<img src="${escapeHtml(settings.signature_url)}" alt="" />` : ""}</div>
-    <p class="signoff"><b>Jim Dema-ala</b>, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
+    <div class="sig-slot"></div>
+    <p class="signoff">${settings.signature_url
+      ? `<span class="sig-mark"><img src="${escapeHtml(settings.signature_url)}" alt="" /></span>` : ""
+      }<b>Jim Dema-ala</b>, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
     <div class="pagebreak"></div>`;
 
   /* ---- everything after the cover ----

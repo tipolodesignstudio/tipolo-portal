@@ -190,23 +190,34 @@
   margin: 0 0 12pt;
 }
 .doc .closing { margin: 14pt 0 0; }
-/* Three lines of room after "Sincerely," for the signature. It is a minimum, not a cap:
-   the space is held even with no image, and a squarer signature (initials rather than a
-   wide strip) is allowed to grow to a legible height instead of being squashed into it. */
-.doc .sig-slot {
-  min-height: 3.2em;
-  margin-top: 2pt;
-  display: flex;
-  align-items: center;
+/* Three lines of clear space after "Sincerely," — the room a signature is written into.
+   It stays whether or not there is an image. */
+.doc .sig-slot { height: 3.2em; }
+
+/* The signature is written OVER the typed name rather than sitting above it, the way a
+   signed letter reads. It is taken out of flow so it displaces nothing.
+
+   --sig-ink-baseline is where the writing sits down the image: this signature's letters
+   run across the top with the long J-loop sweeping through the lower two thirds, so its
+   baseline is about 0.3 of the way down, not the middle. `top` lines that up with the
+   name's own baseline. Both are variables so a different signature can be re-tuned
+   without touching the rule. */
+.doc .signoff {
+  position: relative;
+  margin: 4pt 0 0;
 }
-.doc .sig-slot img {
-  max-height: 0.8in;
-  max-width: 2.6in;
-  object-fit: contain;
-  object-position: left center;
-}
-.doc .signoff { margin: 4pt 0 0; }
 .doc .signoff b { font-weight: 700; }
+.doc .sig-mark {
+  --sig-h: 0.86in;
+  --sig-ink-baseline: 0.30;
+  --sig-name-baseline: 12.4px;   /* baseline of the 9.1pt/1.45 name line */
+  position: absolute;
+  left: 0;
+  top: calc(var(--sig-name-baseline) - var(--sig-ink-baseline) * var(--sig-h));
+  height: var(--sig-h);
+  pointer-events: none;
+}
+.doc .sig-mark img { height: 100%; width: auto; display: block; }
 /* Read by paginate(): the cover letter owns page 1, the proposal starts overleaf. */
 .doc .pagebreak { height: 0; }
 
