@@ -116,6 +116,18 @@ margins (`.doc:not(.letterhead)`).
 - Non-draft proposals show the same split, read-only.
 - Under 1000px wide the panes become **Edit** / **Preview** tabs.
 
+### Templates
+
+**Tipolo standard proposal** is the built-in default (`js/core/proposal-template.js`) —
+every part complete, project specifics in `[brackets]`. **Web Design**
+(`js/core/template-web-design.js`) fills the cover letter, work plan and schedule in for
+a website job, transcribed from the ConnectLA proposal; it shares the fee structure and
+services agreement with the standard one rather than copying them.
+
+A template stores the same blocks a proposal does, so the schedule chart, fee tables and
+signature survive the round trip. The template editor shows those as labelled rows — they
+are edited on the proposal itself, not in the template.
+
 ## Importing a proposal from a PDF
 
 **Proposals → Import PDF.** The PDF is read in the browser (`pdf.js` is vendored, same as

@@ -27,10 +27,15 @@ export function resolveTokens(text, map) {
     key in map ? map[key] : m);
 }
 
+// Resolves the text and keeps everything else. A proposal block carries part, level,
+// kind, rows and breakBefore as well as heading/body; rebuilding it from two fields
+// would flatten a structured template back into a plain list of sections.
 export function resolveSections(sections, map) {
   return (sections || []).map((s) => ({
-    heading: resolveTokens(s.heading, map),
-    body: resolveTokens(s.body, map),
+    ...s,
+    ...(s.heading === undefined ? {} : { heading: resolveTokens(s.heading, map) }),
+    ...(s.body === undefined ? {} : { body: resolveTokens(s.body, map) }),
+    ...(s.rows ? { rows: s.rows.map((r) => ({ ...r })) } : {}),
   }));
 }
 

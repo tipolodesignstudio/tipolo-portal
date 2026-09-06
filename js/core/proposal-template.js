@@ -95,7 +95,14 @@ const SCHEDULE = [
   { part: "schedule", kind: "schedule", scale: "week", rows: scheduleSeed() },
 ];
 
-// Monday of next week, then week offsets from it.
+// Monday of next week, then week offsets from it. Task names are passed in so a
+// specialised template (see template-web-design.js) can seed its own.
+export function scheduleSeedFor(taskNames = []) {
+  const rows = scheduleSeed();
+  taskNames.forEach((name, i) => { if (rows[i + 1]) rows[i + 1].task = name; });
+  return rows;
+}
+
 function scheduleSeed() {
   const mon = new Date();
   mon.setHours(0, 0, 0, 0);
@@ -116,7 +123,7 @@ function scheduleSeed() {
 
 /* ------------------------------------------------------------------- design fees */
 
-const FEES = [
+const FEES = () => [
   { part: "fees", level: 1, heading: "Design Fees", body:
 `Base scope fees are determined by the level of effort and estimated hours, calculated using our hourly rate. This is a not-to-exceed estimate, not a padded quote. Only hours incurred will be invoiced to the Client. Optional Scope to be confirmed by Client in writing and will be invoiced after each approved task is completed.` },
 
@@ -154,7 +161,7 @@ const FEES = [
 /* -------------------------------------------------------- design services agreement
    House boilerplate — kept word for word. Every clause is still editable per proposal. */
 
-const AGREEMENT = [
+const AGREEMENT = () => [
   { part: "agreement", level: 1, breakBefore: true, heading: "Design Services Agreement", body:
 `This agreement (the "Design Services Agreement") is made on "Date" by and between [Client Legal Name] as the "Client", and Tipolo Design Studio as the "Designer". In consideration of the mutual agreement made herein, both parties agree as follows:` },
 
@@ -206,8 +213,13 @@ A technical revision refers to visual and technical deficiencies in the work ren
 /* ---------------------------------------------------------------------- assembly */
 
 // A fresh proposal: every part complete, specifics still in brackets.
+// Shared by every template — the fee structure and the services agreement do not vary
+// by discipline, only the cover letter and work plan do.
+export const FEES_BLOCKS = FEES;
+export const AGREEMENT_BLOCKS = AGREEMENT;
+
 export function defaultSections() {
-  return [...COVER, ...WORKPLAN, ...SCHEDULE, ...FEES, ...AGREEMENT]
+  return [...COVER, ...WORKPLAN, ...SCHEDULE, ...FEES(), ...AGREEMENT()]
     .map((b) => ({ ...b, ...(b.rows ? { rows: b.rows.map((r) => ({ ...r })) } : {}) }));
 }
 

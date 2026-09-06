@@ -55,8 +55,28 @@ export async function render(root, ctx) {
   const secs = root.querySelector("#secs");
   const linesEl = root.querySelector("#lines");
 
+  // A template can hold the proposal builder's structured blocks (a schedule chart, the
+  // fee tables, the signature). They have no heading or body to edit, so show what they
+  // are instead of two blank inputs — the block itself is left untouched on save.
+  const KIND_LABEL = {
+    schedule: "Schedule — gantt chart",
+    fees: "Base scope fee table",
+    "optional-fees": "Optional scope fee table",
+    payment: "Payment schedule",
+    signature: "Signature block",
+  };
+
   const renderSecs = () => {
-    secs.innerHTML = sections.length ? sections.map((s, i) => `
+    secs.innerHTML = sections.length ? sections.map((s, i) => s.kind ? `
+      <div class="sec-block" data-i="${i}">
+        <div class="cluster" style="gap:6px">
+          <span class="badge grey">${escapeHtml(KIND_LABEL[s.kind] || s.kind)}</span>
+          <span class="faint" style="font-size:.8rem;flex:1">Edited on the proposal itself.</span>
+          <button class="btn link" data-move="-1" ${i === 0 ? "disabled" : ""}>↑</button>
+          <button class="btn link" data-move="1" ${i === sections.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="btn link" data-del-sec>remove</button>
+        </div>
+      </div>` : `
       <div class="sec-block" data-i="${i}">
         <div class="cluster" style="gap:6px;margin-bottom:6px">
           <input data-k="heading" value="${escapeHtml(s.heading || "")}" placeholder="Heading" style="flex:1" />
