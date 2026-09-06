@@ -211,9 +211,10 @@
   --sig-h: 0.86in;
   --sig-ink-baseline: 0.30;
   --sig-name-baseline: 12.4px;   /* baseline of the 9.1pt/1.45 name line */
+  --sig-lift: 1.45em;            /* raise it, in lines — 1.45em is one line of body copy */
   position: absolute;
   left: 0;
-  top: calc(var(--sig-name-baseline) - var(--sig-ink-baseline) * var(--sig-h));
+  top: calc(var(--sig-name-baseline) - var(--sig-ink-baseline) * var(--sig-h) - var(--sig-lift));
   height: var(--sig-h);
   pointer-events: none;
 }
