@@ -51,8 +51,11 @@ css/print.css              print-only: @page size/margins, hide everything but #
 vendor/supabase-js.esm.js  vendored Supabase client (+ node-buffer-shim.mjs)
 vendor/pdf.min.mjs         vendored pdf.js (+ pdf.worker.min.mjs) — proposal PDF import
 js/app.js                  bootstrap: config check → auth gate → shell + router
-js/core/       supabase, auth, router, render, format, api,
-               pdf-text + proposal-parse (PDF import)
+js/core/       supabase, auth, router, render, format, api, tokens,
+               pdf-text + proposal-parse (PDF import),
+               proposal-template (the house proposal), gantt (schedule layout)
+js/print/      proposal-doc (the document), paginate (pages), proposal-print,
+               invoice-print
 js/components/  layout (shell), modal, toast
 js/views/      login, dashboard, settings, soon (placeholder for later phases)
 supabase/migrations/       SQL — run in the Supabase SQL editor, in order
@@ -70,7 +73,7 @@ dev/                       local parser check (not used by the app)
 | 4 | Proposals + templates + conversion | ✅ built |
 | 5 | Expenses (project & business, re-billable) | ✅ built |
 | — | Proposal PDF import (read a PDF into a draft, or save it as a template) | ✅ built |
-| — | Proposal builder: split editor + live print preview | ✅ built |
+| — | Proposal builder: split editor + live print preview, house format, gantt schedule | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
 
@@ -95,12 +98,12 @@ Its three placeholders are wired to real data:
 | `[Project Name]` | the proposal title |
 | `Month DD, YYYY` | the sent date, or the date the proposal was created |
 
-Because the letterhead is a Word header/footer, its band and bar repeat on every page.
-In print that is a `<thead>`/`<tfoot>` — the one construct browsers repeat across pages.
-The preview draws them once on a continuous sheet, so a multi-page proposal shows the
-band a page short of what prints. `@page` margin is zero so the bands can bleed; the
-0.75in text margins are applied inside the document. Invoices are not on the letterhead
-and carry their own margins (`.doc:not(.letterhead)`).
+Because the letterhead is a Word header/footer, its band and bar belong on every page.
+`js/print/paginate.js` measures the flow and builds the pages itself, so each sheet
+carries its own band, bar and page number — and the preview shows the same pages the
+printer produces. `@page` margin is zero so the bands can bleed; the 0.75in text margins
+are applied inside the document. Invoices are not on the letterhead and carry their own
+margins (`.doc:not(.letterhead)`).
 
 - **Real pages** — the preview is the document's actual 8.5x11 sheets, laid out by
   `js/print/paginate.js`; a heading is never left at the foot of a page.
