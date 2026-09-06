@@ -352,8 +352,10 @@ export async function render(root, ctx) {
   zoomSel.value = zoomMode;
 
   function applyZoom() {
+    // Fit the widest sheet — a landscape gantt page is 11in, not 8.5in.
+    const widest = paper.querySelector(".sheet-page.landscape") ? 11 * 96 : PAGE_W;
     zoom = zoomMode === "fit"
-      ? Math.min(1, Math.max(0.35, (previewPane.clientWidth - 40) / PAGE_W))
+      ? Math.min(1, Math.max(0.3, (previewPane.clientWidth - 40) / widest))
       : Number(zoomMode) || 1;
     paper.style.setProperty("--zoom", zoom);
   }
@@ -362,7 +364,10 @@ export async function render(root, ctx) {
     // proposalDocHtml() returns finished 8.5x11 sheets, so the preview is the pages.
     paper.innerHTML = proposalDocHtml(live(), settings);
     const n = paper.querySelectorAll(".sheet-page").length;
-    pagesLabel.textContent = `${n} page${n === 1 ? "" : "s"}`;
+    const land = paper.querySelectorAll(".sheet-page.landscape").length;
+    pagesLabel.textContent = `${n} page${n === 1 ? "" : "s"}`
+      + (land ? ` · ${land} landscape` : "");
+    if (zoomMode === "fit") applyZoom();
     highlightPreview();
   }
 

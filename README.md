@@ -102,9 +102,11 @@ band a page short of what prints. `@page` margin is zero so the bands can bleed;
 0.75in text margins are applied inside the document. Invoices are not on the letterhead
 and carry their own margins (`.doc:not(.letterhead)`).
 
-- **Page guides** — dashed rules mark where Letter pages break, so you can see a heading
-  about to be orphaned. They're approximate: the real print also avoids splitting table
-  rows and stranding headings.
+- **Real pages** — the preview is the document's actual 8.5x11 sheets, laid out by
+  `js/print/paginate.js`; a heading is never left at the foot of a page.
+- **Landscape schedule** — a gantt chart wider than the portrait column (over 6 week
+  columns, or 10 working-day columns) moves to a landscape page of its own, heading and
+  all. Only when it has to; a six-week chart stays in place.
 - **Fit / 50 / 75 / 100%** zoom, and a draggable divider. Both are remembered.
 - **Cmd/Ctrl+S** saves; an *Unsaved* badge shows when there's something to save, and
   closing the tab mid-edit warns you.

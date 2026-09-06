@@ -262,7 +262,12 @@ export function proposalDocHtml(p, settings = {}) {
       const tag = ` data-blk="${i}"`;
       // "Start on a new page" on a heading block
       const brk = b.breakBefore ? `<div class="pagebreak"></div>` : "";
-      if (b.kind === "schedule") return brk + `<div class="unit"${tag}>${scheduleTable(b.rows, b.scale)}</div>`;
+      if (b.kind === "schedule") {
+        // A chart too wide for the portrait column gets a landscape page of its own.
+        const wide = buildGantt(b.rows || [], b.scale).needsLandscape;
+        return brk + `<div class="unit"${tag}${wide ? ` data-landscape="1"` : ""}>`
+          + `${scheduleTable(b.rows, b.scale)}</div>`;
+      }
       if (b.kind === "fees") return brk + `<div class="unit"${tag}>${feeTable(items)}</div>`;
       if (b.kind === "optional-fees") return brk + `<div class="unit"${tag}>${optionalTable(b.rows)}</div>`;
       if (b.kind === "signature") return brk + `<div class="unit"${tag}>${signatureBlock(settings)}</div>`;
@@ -281,10 +286,10 @@ export function proposalDocHtml(p, settings = {}) {
   /* ---- lay it onto Letter pages ---- */
 
   const pages = paginate(coverHtml + rest);
-  const sheets = pages.map((units, n) => `
-    <div class="sheet-page">
+  const sheets = pages.map((pg, n) => `
+    <div class="sheet-page${pg.landscape ? " landscape" : ""}">
       ${head}
-      <div class="lh-body">${units.join("")}</div>
+      <div class="lh-body">${pg.units.join("")}</div>
       <div class="lh-foot">${foot(n + 1)}</div>
     </div>`).join("");
 

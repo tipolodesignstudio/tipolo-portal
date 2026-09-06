@@ -19,6 +19,10 @@ const PAD_BOTTOM = 18;
 // Room for body copy on one page.
 export const CONTENT_H = PAGE_H - BAND_H - BAR_H - PAD_TOP - PAD_BOTTOM;
 
+// Landscape Letter, used for a gantt chart too wide for the portrait column.
+export const LAND_W = 11 * PX_IN;
+export const LAND_H = 8.5 * PX_IN;
+
 // A heading must not be the last thing on a page. `keep` marks a unit that has to stay
 // with the one after it — headings, and the "A. Base Scope" style labels above tables.
 const KEEP = new Set(["H1", "H2", "H3"]);
@@ -41,24 +45,42 @@ function measure(flowHtml) {
       top: parseFloat(cs.marginTop || 0),
       keep: KEEP.has(el.tagName) || el.dataset.keep === "1",
       brk: el.classList.contains("pagebreak"),
+      landscape: el.dataset.landscape === "1",
     };
   });
   host.remove();
   return units;
 }
 
+// Returns [{ landscape, units }] — one entry per printed page.
 export function paginate(flowHtml) {
   const units = measure(flowHtml);
   const pages = [];
   let page = [];
   let used = 0;
 
-  const push = () => { pages.push(page); page = []; used = 0; };
+  const push = (landscape = false) => {
+    pages.push({ landscape, units: page });
+    page = [];
+    used = 0;
+  };
 
   for (let i = 0; i < units.length; i++) {
     const u = units[i];
 
     if (u.brk) { if (page.length) push(); continue; }
+
+    // A chart too wide for the portrait column takes a landscape page to itself, and
+    // brings its heading along so the page is not left titleless.
+    if (u.landscape) {
+      const prev = page[page.length - 1];
+      const heading = units[i - 1]?.keep && prev === units[i - 1].html;
+      if (heading) page.pop();
+      if (page.length) push();
+      page = heading ? [units[i - 1].html, u.html] : [u.html];
+      push(true);
+      continue;
+    }
 
     // A heading that would sit alone at the foot of a page goes over with its text.
     if (u.keep && page.length) {
@@ -74,5 +96,5 @@ export function paginate(flowHtml) {
     used += need;
   }
   if (page.length) push();
-  return pages.length ? pages : [[]];
+  return pages.length ? pages : [{ landscape: false, units: [] }];
 }

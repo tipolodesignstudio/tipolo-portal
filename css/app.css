@@ -595,9 +595,10 @@ body.splitting { cursor: col-resize; user-select: none; }
 .paper {
   margin: 0 auto;
   zoom: var(--zoom, 1);
-  width: 8.5in;
+  width: fit-content;     /* widens for a landscape sheet, centres the portrait ones */
   padding: 0;
 }
+.paper .sheet-page { margin-inline: auto; }
 .paper .sheet-page {
   box-shadow: 0 1px 3px rgba(36, 42, 32, .16), 0 10px 34px rgba(36, 42, 32, .13);
 }

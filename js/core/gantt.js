@@ -14,6 +14,13 @@ const DAY = 86400000;
 const MAX_WEEK_COLS = 30;
 const MAX_DAY_COLS = 60;
 
+// What a portrait page can hold before the columns get too narrow to read. Beyond this
+// the chart is given its own landscape page — see paginate().
+//   portrait  8.5in - 1.5in margins - 1.55in task column = 5.45in of chart
+//   landscape  11in - 1.5in margins - 1.55in task column = 7.95in of chart
+const PORTRAIT_WEEK_COLS = 6;
+const PORTRAIT_DAY_COLS = 10;
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const WD = ["M", "T", "W", "T", "F"];
 
@@ -104,5 +111,8 @@ export function buildGantt(rows = [], scale = "week") {
     };
   });
 
-  return { scale, colCount, weeks, cols, bars, truncated, undated };
+  // Only when necessary: a six-week chart still sits happily on the portrait page.
+  const needsLandscape = colCount > (scale === "day" ? PORTRAIT_DAY_COLS : PORTRAIT_WEEK_COLS);
+
+  return { scale, colCount, weeks, cols, bars, truncated, undated, needsLandscape };
 }

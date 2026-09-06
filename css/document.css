@@ -67,6 +67,14 @@
 /* The page number sits on the contact line, right margin — same baseline, same size,
    same colour as hello@tipolo.ca. */
 .doc.letterhead .pageno { font-variant-numeric: tabular-nums; }
+/* A gantt chart too wide for the portrait column gets a landscape page to itself.
+   The named page turns just that sheet, so the rest of the proposal stays portrait. */
+.doc.letterhead .sheet-page.landscape {
+  width: 11in;
+  height: 8.5in;
+  page: ganttPage;
+}
+
 /* The probe paginate() measures in is never shown. */
 .pagination-probe .sheet-page { height: auto; }
 
@@ -332,6 +340,8 @@
   .doc table.fees tr, .doc table.sched tr, .doc table.lines tr { break-inside: avoid; }
   .doc .sig, .doc .totals, .doc .doc-foot { break-inside: avoid; }
 }
+
+@page ganttPage { size: Letter landscape; margin: 0; }
 
 /* Print: one sheet per page, and nothing may flow between them. */
 @media print {
