@@ -4,14 +4,20 @@
    a paper-sized box, they lay out the preview too. One set of rules, so what Jim sees
    while editing is what the client receives.
 
-   Measurements are taken from 04_Templates/Letterhead Design/Tipolo Letterhead.docx:
-     page      Letter, margins 0.75in left/right, 1in top/bottom
+   Letterhead, from 04_Templates/Letterhead Design/Tipolo Letterhead.docx:
+     page      Letter, text margins 0.75in
      band      #F6F3EA, full bleed, 1.75in tall
      wordmark  Fredoka 18pt — TIPOLO SemiBold #45372F, DESIGN STUDIO Medium #565C4E
      tagline   Roboto 9pt #565C4E, right aligned
-     doc type  "Proposal", Fredoka Medium bold 18pt
-     fields    labels Roboto Light 9pt #312E25, values Roboto Medium; tab stop 0.5in
-     bar       #5C4A3D, full bleed, 0.47in tall; Roboto Light 8pt #F6F3EA at the margin
+     doc type  "Proposal", Fredoka Medium 18pt
+     fields    labels Roboto Light 9pt #312E25, values Medium; tab stop 0.5in
+     bar       #5C4A3D, full bleed, 0.47in; Roboto Light 8pt #F6F3EA at the margin
+
+   Type scale, measured off 05_Proposals/26102 Connect LA Website:
+     h1  13.9pt   "Work Plan", "Design Fees"
+     h2  10.6pt   "Task 1: …", "Payment Schedule"
+     h3   9.1pt bold   "Deliverables", "Confidentiality"
+     body 9.1pt; list indents step 18pt from the 0.75in margin
    Sizes stay in pt: at 96dpi the browser maps pt to px at a fixed ratio, so an 8.5in
    sheet on screen shows type at exactly its printed size. */
 
@@ -24,15 +30,15 @@
   --lh-margin: 0.75in;
 
   background: #fff;
-  color: #1a1a1a;
+  color: var(--lh-label);
   font-family: 'Roboto', Arial, sans-serif;
-  font-size: 11pt;
-  line-height: 1.5;
+  font-size: 9.1pt;
+  line-height: 1.45;
 }
 
 /* Invoices are not on the letterhead — they carry their own page margins, since @page
-   is set to zero margin for the proposal's full-bleed bands. */
-.doc:not(.letterhead) { padding: 18mm 16mm; }
+   is set to zero margin for the proposal's full-bleed bands, and the older 11pt body. */
+.doc:not(.letterhead) { padding: 18mm 16mm; font-size: 11pt; line-height: 1.5; color: #1a1a1a; }
 
 .doc .doc-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
 .doc .doc-head .biz { font-family: 'Fredoka', Arial, sans-serif; }
@@ -46,7 +52,9 @@
 .doc .sheet > thead { display: table-header-group; }
 .doc .sheet > tfoot { display: table-footer-group; }
 .doc .sheet td { padding: 0; vertical-align: top; }
-.doc .lh-body-cell { padding: 26px var(--lh-margin) 18px; }
+/* Beats `.doc .sheet td` above — without the extra element selector the body copy
+   would run to the paper edge. */
+.doc .sheet td.lh-body-cell { padding: 26px var(--lh-margin) 18px; }
 
 /* ---------- header band ---------- */
 .doc .lh-band {
@@ -108,32 +116,94 @@
   letter-spacing: .01em;
 }
 
-/* ---------- body ---------- */
-.doc .parties { display: flex; gap: 40px; margin: 20px 0 26px; font-size: 10.5pt; }
-.doc.letterhead .parties { margin: 0 0 22px; }
-.doc .parties h4 { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #888; margin-bottom: 4px; }
+/* ---------- proposal body ---------- */
+.doc.letterhead p { margin: 0 0 7.5pt; }
+.doc.letterhead p:last-child { margin-bottom: 0; }
 
+.doc.letterhead h1 {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13.9pt; font-weight: 500; line-height: 1.2;
+  color: var(--lh-label);
+  margin: 20pt 0 7pt;
+}
+.doc.letterhead h2 {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 10.6pt; font-weight: 500; line-height: 1.25;
+  color: var(--lh-label);
+  margin: 13pt 0 4pt;
+}
+.doc.letterhead h3 {
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 9.1pt; font-weight: 500; line-height: 1.35;
+  color: var(--lh-label);
+  margin: 9pt 0 2pt;
+}
+.doc.letterhead .blk:first-child h1,
+.doc.letterhead .blk.lv1:first-of-type h1 { margin-top: 0; }
+
+/* bullets and numbered items; each level steps 18pt, as in the source document */
+.doc.letterhead .li { display: flex; gap: 6pt; margin-bottom: 1.5pt; }
+.doc.letterhead .li .mk { flex: none; min-width: 10pt; }
+.doc.letterhead .li.lvl0 { padding-left: 18pt; }
+.doc.letterhead .li.lvl1 { padding-left: 36pt; }
+.doc.letterhead .li.lvl2 { padding-left: 54pt; }
+.doc.letterhead .li.lvl3 { padding-left: 72pt; }
+/* a paragraph following a list needs the same air as one following a paragraph */
+.doc.letterhead .li + p { margin-top: 7.5pt; }
+
+/* ---------- cover letter ---------- */
+.doc .cover .addressee { margin-bottom: 14pt; }
+.doc .cover .re { font-weight: 500; text-transform: uppercase; margin: 0 0 12pt; }
+.doc .cover .closing { margin: 14pt 0 0; }
+.doc .cover .signoff { margin: 18pt 0 0; }
+/* The cover letter is its own page; the proposal proper starts overleaf. */
+.doc .pagebreak { break-after: page; page-break-after: always; height: 0; }
+
+/* ---------- schedule ---------- */
+.doc table.sched { width: 100%; border-collapse: collapse; margin: 6pt 0 4pt; font-size: 8.5pt; }
+.doc table.sched th {
+  text-align: left; padding: 4pt 6pt; border-bottom: 1.2px solid var(--lh-bark);
+  font-size: 7.4pt; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: var(--lh-muted);
+}
+.doc table.sched td { padding: 4pt 6pt; border-bottom: 1px solid #E6E2D6; }
+.doc table.sched .dt { width: 1.15in; text-align: left; font-variant-numeric: tabular-nums; }
+
+/* ---------- fees ---------- */
+.doc table.fees { width: 100%; border-collapse: collapse; margin: 5pt 0 10pt; font-size: 9.1pt; }
+.doc table.fees th {
+  text-align: left; padding: 4pt 6pt; border-bottom: 1.2px solid var(--lh-bark);
+  font-size: 8pt; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: var(--lh-muted);
+}
+.doc table.fees td { padding: 4pt 6pt; border-bottom: 1px solid #E6E2D6; }
+.doc table.fees .ix { width: 22pt; color: var(--lh-muted); }
+.doc table.fees .fee { width: 1.05in; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.doc table.fees tr.total td { border-bottom: none; border-top: 1.2px solid var(--lh-bark); font-weight: 500; }
+.doc table.fees, .doc table.sched { margin-left: 18pt; width: calc(100% - 18pt); }
+
+/* ---------- signature block ---------- */
+.doc .sig { margin-top: 16pt; }
+.doc .sig p { margin-bottom: 16pt; }
+.doc .sig-row { display: flex; align-items: flex-end; gap: 10pt; margin-bottom: 14pt; max-width: 3.6in; }
+.doc .sig-row.short { max-width: 2.2in; }
+.doc .sig-row .rule { flex: 1; border-bottom: 1px solid var(--lh-label); height: 12pt; }
+.doc .sig-row .name { flex: 1; border-bottom: 1px solid var(--lh-label); height: 12pt; }
+.doc .sig-row .cap { flex: none; font-size: 8pt; color: var(--lh-muted); }
+
+/* ---------- invoice-only bits ---------- */
+.doc .parties { display: flex; gap: 40px; margin: 20px 0 26px; font-size: 10.5pt; }
+.doc .parties h4 { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #888; margin-bottom: 4px; }
 .doc table.lines { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 10.5pt; }
 .doc table.lines th { text-align: left; border-bottom: 1.5px solid var(--lh-bark); padding: 7px 8px; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: #555; }
 .doc table.lines td { padding: 7px 8px; border-bottom: 1px solid #e2e2e2; vertical-align: top; }
 .doc table.lines td.num, .doc table.lines th.num { text-align: right; font-variant-numeric: tabular-nums; }
-
 .doc .totals { margin-left: auto; width: 52%; font-size: 10.5pt; }
 .doc .totals .row { display: flex; justify-content: space-between; padding: 4px 8px; }
 .doc .totals .row.grand { border-top: 1.5px solid var(--lh-bark); font-weight: 500; font-size: 12pt; margin-top: 4px; padding-top: 8px; }
-
-.doc .section { margin: 16px 0; }
-.doc .section h3 { font-family: 'Fredoka', Arial, sans-serif; font-weight: 500; font-size: 12pt; margin-bottom: 4px; color: var(--lh-label); }
 .doc .doc-foot { margin-top: 34px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9.5pt; color: #666; white-space: pre-wrap; }
 
-/* An empty section body still needs to occupy its line in the preview, or the paper
-   jumps around as you type the first character. */
-.doc .section .body:empty::after { content: "\200b"; }
-
-/* Keep a heading with the text under it, and never split a fee row across pages. */
+/* Keep a heading with the text under it, and never split a row or the sign-off. */
 @media print {
-  .doc .section h3 { break-after: avoid; }
-  .doc table.lines tr { break-inside: avoid; }
-  .doc .totals { break-inside: avoid; }
-  .doc .doc-foot { break-inside: avoid; }
+  .doc.letterhead h1, .doc.letterhead h2, .doc.letterhead h3 { break-after: avoid; }
+  .doc table.fees tr, .doc table.sched tr, .doc table.lines tr { break-inside: avoid; }
+  .doc .sig, .doc .totals, .doc .doc-foot { break-inside: avoid; }
 }

@@ -6,6 +6,7 @@ import {
   listProposals, listClients, listTemplates, getTemplate, createProposal, getSettings,
 } from "../core/api.js";
 import { buildTokenMap, resolveSections } from "../core/tokens.js";
+import { defaultSections, defaultLineItems } from "../core/proposal-template.js";
 import { openModal } from "../components/modal.js";
 import { field, select } from "../components/form.js";
 import { toastErr } from "../components/toast.js";
@@ -117,7 +118,8 @@ export async function newProposalFlow(ctx, presetClientId = "") {
       ${select("project_scope", "Scope", "landscape",
         SCOPES.map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) })))}
       ${select("template_id", "Template", "",
-        [{ value: "", label: "None — blank proposal" },
+        [{ value: "", label: "Tipolo standard proposal" },
+         { value: "__blank__", label: "Blank — start from nothing" },
          ...templates.map((t) => ({ value: t.id, label: t.name }))])}
       <div class="hint">The proposal is valid for 1 year from the day you mark it “sent”.</div>
     </form>`,
@@ -127,9 +129,14 @@ export async function newProposalFlow(ctx, presetClientId = "") {
       const client = clients.find((c) => c.id === clientId);
       const templateId = f.get("template_id") || null;
 
+      // No template chosen = the house proposal, complete with the standard work plan,
+      // fee structure and services agreement, specifics left in [brackets].
       let sections = [];
       let lineItems = [];
-      if (templateId) {
+      if (!templateId) {
+        sections = defaultSections();
+        lineItems = defaultLineItems();
+      } else if (templateId !== "__blank__") {
         const tpl = await getTemplate(templateId);
         const draft = {
           title: f.get("title"), project_scope: f.get("project_scope"),
@@ -142,7 +149,8 @@ export async function newProposalFlow(ctx, presetClientId = "") {
       const subtotal = lineItems.reduce((s, li) => s + (Number(li.qty) || 0) * (Number(li.unit_price) || 0), 0);
 
       return await createProposal({
-        template_id: templateId,
+        // "__blank__" is a UI choice, not a template row — never send it to the FK.
+        template_id: templateId && templateId !== "__blank__" ? templateId : null,
         client_id: clientId,
         title: f.get("title"),
         project_scope: f.get("project_scope"),

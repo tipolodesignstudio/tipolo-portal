@@ -1,15 +1,15 @@
-// The proposal document, as markup — built to the Tipolo letterhead
-// (04_Templates/Letterhead Design/Tipolo Letterhead.docx).
+// The proposal document, as markup — the Tipolo letterhead + the house proposal format
+// (04_Templates/Letterhead Design/Tipolo Letterhead.docx and the ConnectLA proposal).
 //
 // This is the single source of truth for what a proposal looks like on paper. The
 // builder's preview pane and the print path both call it, so the preview isn't a
 // lookalike — it's the same HTML under the same stylesheet (css/document.css).
 //
-// The letterhead is a Word header/footer pair, so its band and bar repeat on every
-// page. Here that is a <thead>/<tfoot>, which is the one construct browsers repeat
-// across printed pages.
+// The letterhead is a Word header/footer, so its band and bar repeat on every page.
+// Here that is a <thead>/<tfoot>, which is the one construct browsers repeat across
+// printed pages.
 //
-// Three placeholders in the .docx are wired to real data:
+// Three placeholders from the .docx are wired to real data:
 //     YYNNN            -> proposal number   (DRAFT until one is drawn)
 //     [Project Name]   -> proposal title
 //     Month DD, YYYY   -> sent date, else the date it was created
@@ -19,8 +19,9 @@
 
 import { escapeHtml, money, num, date, longDate } from "../core/format.js";
 import { lineAmount } from "../core/invoice-calc.js";
-import { buildTokenMap, resolveSections } from "../core/tokens.js";
+import { buildTokenMap, resolveTokens } from "../core/tokens.js";
 import { clientPrimaryContact } from "../core/api.js";
+import { normaliseSections } from "../core/proposal-template.js";
 
 // Set verbatim from the letterhead. Settings has no field that matches these two
 // lines (its `email` is the accounts address, not the one printed here), so they live
@@ -28,22 +29,92 @@ import { clientPrimaryContact } from "../core/api.js";
 const TAGLINE = "Port Moody, BC • tipolo.ca";
 const CONTACT = "hello@tipolo.ca | 604.729.0597";
 
+/* Body copy: blank lines separate paragraphs; a line starting "• " is a bullet, and
+   each two spaces in front of it steps the indent in one more level (18pt), the way
+   the source document nests its lists. "1." and "A." lead lines keep their marker. */
+function prose(text, map) {
+  const src = resolveTokens(text || "", map);
+  if (!src.trim()) return "";
+  return src.split(/\n{2,}/).map((para) => {
+    const lines = para.split("\n");
+    const isList = lines.every((l) => /^\s*(?:[•\-*]|\d+\.|[A-Z]\.)\s/.test(l));
+    if (!isList) {
+      return `<p>${lines.map((l) => escapeHtml(l.trim())).join("<br>")}</p>`;
+    }
+    return lines.map((l) => {
+      const indent = Math.floor((l.match(/^ */)[0].length) / 2);
+      const m = l.trim().match(/^([•\-*]|\d+\.|[A-Z]\.)\s+(.*)$/);
+      const marker = m[1] === "-" || m[1] === "*" ? "•" : m[1];
+      return `<div class="li lvl${Math.min(indent, 3)}">`
+        + `<span class="mk">${escapeHtml(marker)}</span>`
+        + `<span>${escapeHtml(m[2])}</span></div>`;
+    }).join("");
+  }).join("");
+}
+
+function scheduleTable(rows = []) {
+  if (!rows.length) return "";
+  return `<table class="sched"><thead><tr>
+      <th>Task</th><th class="dt">Start</th><th class="dt">Due</th>
+    </tr></thead><tbody>
+    ${rows.map((r) => `<tr>
+      <td>${escapeHtml(r.task || "")}</td>
+      <td class="dt">${escapeHtml(r.start || "")}</td>
+      <td class="dt">${escapeHtml(r.due || "")}</td></tr>`).join("")}
+  </tbody></table>`;
+}
+
+function feeTable(items) {
+  const subtotal = items.reduce((s, li) => s + lineAmount(li), 0);
+  const hours = items.reduce((s, li) => s + (Number(li.qty) || 0), 0);
+  return `<table class="fees"><thead><tr>
+      <th class="ix"></th><th>Task Description and Timeline</th><th class="fee">Fee</th>
+    </tr></thead><tbody>
+    ${items.map((li, i) => `<tr>
+      <td class="ix">${i + 1}</td>
+      <td>${escapeHtml(li.description || "")}</td>
+      <td class="fee">${money(lineAmount(li))}</td></tr>`).join("")}
+    <tr class="total">
+      <td class="ix"></td>
+      <td>TOTAL${hours ? ` (approx. ${num(hours, 0)} hrs)` : ""}</td>
+      <td class="fee">${money(subtotal)}</td></tr>
+  </tbody></table>`;
+}
+
+function optionalTable(rows = []) {
+  if (!rows.length) return "";
+  return `<table class="fees"><thead><tr>
+      <th class="ix"></th><th>Description</th><th class="fee">Fee</th>
+    </tr></thead><tbody>
+    ${rows.map((r) => `<tr>
+      <td class="ix">${escapeHtml(r.code || "")}</td>
+      <td>${escapeHtml(r.description || "")}</td>
+      <td class="fee">${escapeHtml(r.fee || "")}</td></tr>`).join("")}
+  </tbody></table>`;
+}
+
+function signatureBlock(settings) {
+  const designer = settings.business_name || "Tipolo Design Studio";
+  return `<div class="sig">
+    <p>Agreed,</p>
+    <div class="sig-row"><span class="rule"></span><span class="cap">Client</span></div>
+    <div class="sig-row short"><span class="rule"></span><span class="cap">Date</span></div>
+    <div class="sig-row named"><span class="name">Jim Dema-ala, ${escapeHtml(designer)}</span><span class="cap">Designer</span></div>
+    <div class="sig-row short"><span class="rule"></span><span class="cap">Date</span></div>
+  </div>`;
+}
+
 export function proposalDocHtml(p, settings = {}) {
   const c = p.client || {};
   const contact = clientPrimaryContact(c);
   const map = buildTokenMap({ client: c, proposal: p, settings });
-  const sections = resolveSections(p.sections, map);
+  const blocks = normaliseSections(p.sections || []);
   const items = p.line_items || [];
-  const subtotal = items.reduce((s, li) => s + lineAmount(li), 0);
 
   // "Tipolo Design Studio" -> TIPOLO (semibold, dark) + DESIGN STUDIO (medium, muted).
   const words = (settings.business_name || "Tipolo Design Studio").trim().split(/\s+/);
   const markLead = words.shift() || "";
   const markRest = words.join(" ");
-
-  const clientAddress = [
-    c.street, c.city, [c.province, c.postal_code].filter(Boolean).join("  "),
-  ].filter(Boolean);
 
   const head = `
     <div class="lh-band">
@@ -63,44 +134,43 @@ export function proposalDocHtml(p, settings = {}) {
 
   const foot = `<div class="lh-bar"><span>${escapeHtml(CONTACT)}</span></div>`;
 
-  const body = `
-    <div class="parties">
-      <div>
-        <h4>Prepared for</h4>
-        <div>${escapeHtml(c.name || "")}</div>
-        ${!c.is_individual && contact
-          ? `<div>Attn: ${escapeHtml(contact.name)}${contact.title ? `, ${escapeHtml(contact.title)}` : ""}</div>`
-          : ""}
-        <div style="white-space:pre-line">${clientAddress.map(escapeHtml).join("\n")}</div>
-      </div>
-      ${p.valid_until ? `<div><h4>Valid until</h4><div>${escapeHtml(date(p.valid_until))}</div></div>` : ""}
-    </div>
+  /* ---- cover letter: the addressee and RE: line come from the record ---- */
 
-    ${sections.map((s, i) => `
-      <div class="section" data-sec="${i}">
-        ${s.heading ? `<h3>${escapeHtml(s.heading)}</h3>` : ""}
-        <div class="body" style="white-space:pre-wrap">${escapeHtml(s.body || "")}</div>
-      </div>`).join("")}
+  const addressee = [
+    contact ? [contact.name, contact.title].filter(Boolean).join(" | ") : c.name,
+    [c.street, c.city, c.province].filter(Boolean).join(", "),
+    [contact?.email || c.email, contact?.phone || c.phone].filter(Boolean).join(" | "),
+  ].filter(Boolean);
 
-    ${items.length ? `
-      <div class="section" data-fee>
-        <h3>Fee schedule</h3>
-        <table class="lines"><thead><tr>
-          <th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th>
-        </tr></thead><tbody>
-          ${items.map((li) => `<tr>
-            <td>${escapeHtml(li.description || "")}</td>
-            <td class="num">${num(li.qty, 2)}</td>
-            <td class="num">${money(li.unit_price)}</td>
-            <td class="num">${money(lineAmount(li))}</td></tr>`).join("")}
-        </tbody></table>
-        <div class="totals">
-          <div class="row grand"><span>Estimated fee</span><span>${money(subtotal)}</span></div>
-          <div class="row"><span></span><span>plus applicable taxes</span></div>
-        </div>
-      </div>` : ""}
+  const cover = blocks.filter((b) => (b.part || "workplan") === "cover");
+  const coverHtml = `
+    <section class="cover">
+      <div class="addressee">${addressee.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}</div>
+      <p class="re">RE: ${escapeHtml((p.title || "").toUpperCase())}</p>
+      ${cover.map((b) => prose(b.body, map)).join("")}
+      <p class="closing">Sincerely,</p>
+      <p class="signoff">Jim Dema-ala, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
+    </section>`;
 
-    <div class="doc-foot">Accepted by _______________________________   Date ______________</div>`;
+  /* ---- everything after the cover ---- */
+
+  // data-blk lets the builder mark the block your cursor is in. It is inert in print.
+  const rest = blocks.map((b, i) => [b, i]).filter(([b]) => (b.part || "workplan") !== "cover")
+    .map(([b, i]) => {
+    const tag = ` data-blk="${i}"`;
+    if (b.kind === "schedule") return `<div${tag}>${scheduleTable(b.rows)}</div>`;
+    if (b.kind === "fees") return `<div${tag}>${feeTable(items)}</div>`;
+    if (b.kind === "optional-fees") return `<div${tag}>${optionalTable(b.rows)}</div>`;
+    if (b.kind === "signature") return `<div${tag}>${signatureBlock(settings)}</div>`;
+
+    const lvl = b.level ?? (b.heading ? 2 : 0);
+    const heading = b.heading
+      ? (lvl === 1 ? `<h1>${escapeHtml(resolveTokens(b.heading, map))}</h1>`
+        : lvl === 2 ? `<h2>${escapeHtml(resolveTokens(b.heading, map))}</h2>`
+        : `<h3>${escapeHtml(resolveTokens(b.heading, map))}</h3>`)
+      : "";
+    return `<section class="blk lv${lvl}"${tag}>${heading}${prose(b.body, map)}</section>`;
+  }).join("");
 
   // thead/tfoot rather than divs: browsers repeat them on every printed page, which is
   // what the Word header and footer do.
@@ -109,7 +179,11 @@ export function proposalDocHtml(p, settings = {}) {
       <table class="sheet">
         <thead><tr><td class="lh-head-cell">${head}</td></tr></thead>
         <tfoot><tr><td class="lh-foot-cell">${foot}</td></tr></tfoot>
-        <tbody><tr><td class="lh-body-cell"><div class="lh-body">${body}</div></td></tr></tbody>
+        <tbody><tr><td class="lh-body-cell"><div class="lh-body">
+          ${coverHtml}
+          <div class="pagebreak"></div>
+          ${rest}
+        </div></td></tr></tbody>
       </table>
     </div>`;
 }

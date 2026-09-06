@@ -631,7 +631,7 @@ body.splitting { cursor: col-resize; user-select: none; }
 .b-card h2 { font-size: 1rem; margin: 0; }
 .b-card .count { font-size: 0.78rem; color: var(--ink-faint); font-weight: 400; }
 
-/* section editor blocks */
+/* section editor blocks (still used by the PDF import review screen) */
 .sec-card {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
@@ -713,6 +713,139 @@ body.splitting { cursor: col-resize; user-select: none; }
 /* The section under the cursor, echoed on the sheet. Screen only in practice: the print
    path rebuilds the markup from scratch, so .hi never reaches paper. */
 .doc .section.hi {
+  box-shadow: -10px 0 0 -7px var(--accent);
+  transition: box-shadow .18s;
+}
+
+/* ============ proposal builder: the writing surface ============
+   The left pane is meant to read like a word processor, not a form: document type,
+   no boxes until you touch something, and the five parts of a Tipolo proposal as tabs.
+   Text stays plain — a block is a heading because of its level, not because of markup
+   typed into it. */
+
+.doc-details {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--card-bg);
+}
+.doc-details label {
+  display: flex; flex-direction: column; gap: 3px;
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-faint);
+}
+.doc-details label:first-child { flex: 1; min-width: 200px; }
+.doc-details input, .doc-details select {
+  font-size: .9rem; padding: 5px 8px; text-transform: none; letter-spacing: 0; color: var(--ink);
+}
+.doc-details .ro { font-size: .9rem; color: var(--ink-soft); text-transform: none; letter-spacing: 0; padding: 5px 0; }
+
+/* part tabs */
+.part-nav {
+  position: sticky; top: 0; z-index: 4;
+  display: flex; gap: 4px; flex-wrap: wrap;
+  padding: 10px 22px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-soft);
+}
+.part-nav button {
+  border: 1px solid transparent; background: none; cursor: pointer;
+  padding: 5px 11px; border-radius: 999px;
+  font-size: .84rem; color: var(--ink-soft);
+  display: flex; align-items: center; gap: 6px;
+}
+.part-nav button:hover { background: var(--bg-alt); color: var(--ink); }
+.part-nav button.active { background: var(--accent); color: #F5F2E9; }
+.part-nav button .n { font-size: .7rem; opacity: .7; font-variant-numeric: tabular-nums; }
+
+/* the page you type on */
+.we {
+  padding: 22px 22px 90px;
+  font-family: 'Roboto', var(--font-body);
+}
+.wb {
+  position: relative;
+  padding: 6px 10px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  margin-bottom: 2px;
+}
+.wb:hover { border-color: var(--border-soft); }
+.wb.on { border-color: var(--border); background: var(--card-bg); }
+.wb.on::before {
+  content: ""; position: absolute; left: -1px; top: 6px; bottom: 6px;
+  width: 2px; background: var(--accent); border-radius: 2px;
+}
+
+/* headings + body, set in the document's own type so the pane reads like the page */
+.wb .wh, .wb .wt {
+  width: 100%; display: block;
+  background: transparent; border: none; padding: 2px 0;
+  color: var(--ink); font-family: inherit;
+}
+.wb .wh:focus, .wb .wt:focus { outline: none; box-shadow: none; }
+.wb .wh::placeholder, .wb .wt::placeholder { color: var(--ink-faint); font-weight: 400; }
+.wb .wh { font-weight: 500; }
+.wb .wh.h1 { font-size: 1.25rem; }
+.wb .wh.h2 { font-size: 1.02rem; }
+.wb .wh.h3 { font-size: .9rem; }
+.wb .wt {
+  font-size: .88rem; line-height: 1.55;
+  resize: none; overflow: hidden; min-height: 24px;
+  white-space: pre-wrap;
+}
+
+/* per-block controls, out of the way until you are in the block */
+.wb-tools {
+  position: absolute; top: 4px; right: 6px;
+  display: none; gap: 2px; align-items: center;
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 2px 3px;
+}
+.wb:hover .wb-tools, .wb.on .wb-tools { display: flex; }
+.wb-tools select {
+  font-size: .72rem; padding: 2px 4px; width: auto;
+  border: none; background: transparent; color: var(--ink-soft);
+}
+.wb-tools .icon-btn {
+  background: none; border: none; cursor: pointer; color: var(--ink-faint);
+  padding: 2px 5px; border-radius: 4px; line-height: 1; font-size: .8rem;
+}
+.wb-tools .icon-btn:hover { background: var(--bg-alt); color: var(--ink); }
+
+/* table blocks — schedule, fees, signature */
+.wb-table { background: var(--bg-alt); border-color: var(--border-soft); padding: 10px; }
+.wb-kind {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-faint); margin-bottom: 7px;
+}
+table.mini { width: 100%; border-collapse: collapse; font-size: .82rem; }
+table.mini th {
+  text-align: left; font-size: .66rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink-faint); font-weight: 500; padding: 0 5px 5px;
+}
+table.mini td { padding: 2px 3px; }
+table.mini input {
+  width: 100%; padding: 5px 7px; font-size: .82rem;
+  background: var(--card-bg); border: 1px solid var(--border-soft); border-radius: 5px;
+}
+table.mini input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(var(--accent-rgb), .12); }
+table.mini .amt { font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 6px; }
+table.mini .icon-btn {
+  background: none; border: none; cursor: pointer; color: var(--ink-faint);
+  padding: 3px 5px; border-radius: 4px; font-size: .8rem;
+}
+table.mini .icon-btn:hover { background: var(--border-soft); color: var(--ink); }
+.mini-foot {
+  display: flex; justify-content: space-between;
+  margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border);
+  font-size: .85rem;
+}
+.mini-foot strong { font-variant-numeric: tabular-nums; }
+
+.wb-add { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+
+/* the block your cursor is in, echoed on the sheet */
+.doc [data-blk].hi {
   box-shadow: -10px 0 0 -7px var(--accent);
   transition: box-shadow .18s;
 }

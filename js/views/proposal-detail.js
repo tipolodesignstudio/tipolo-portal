@@ -1,9 +1,14 @@
-// Proposal builder — a split workspace: the form on the left, the printed page on the
-// right, updating as you type.
+// Proposal builder — a split workspace: the document on the left, the printed page on
+// the right, updating as you type.
 //
-// The preview is not a mock-up of the output. It is the output: proposalDocHtml() builds
-// the same markup printProposal() sends to the printer, styled by the same document.css,
-// laid into a Letter-sized sheet. If it looks right here it prints right.
+// The left pane is deliberately close to a word processor: the five parts of a Tipolo
+// proposal are tabs, and inside each you type into headings and paragraphs set in the
+// document's own type, with no visible boxes until you touch them. Text stays plain —
+// what makes it a heading is its level, not markup you have to write.
+//
+// The preview is not a mock-up of the output. proposalDocHtml() builds the same markup
+// printProposal() sends to the printer, styled by the same document.css, laid into a
+// Letter-sized sheet. If it looks right here it prints right.
 
 import { escapeHtml, money, num, date, debounce } from "../core/format.js";
 import { on } from "../core/render.js";
@@ -13,6 +18,8 @@ import {
 } from "../core/api.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { TOKEN_HELP } from "../core/tokens.js";
+import { PARTS, LEVELS, normaliseSections, defaultSections, defaultLineItems }
+  from "../core/proposal-template.js";
 import { openModal, confirmModal } from "../components/modal.js";
 import { field } from "../components/form.js";
 import { toastOk, toastErr } from "../components/toast.js";
@@ -27,12 +34,19 @@ const SCOPES = ["landscape", "multimedia", "other"];
 // room left for body copy is what remains between them.
 const PAGE_H = 11 * 96;
 const PAGE_W = 8.5 * 96;
-const BAND_H = 1.75 * 96;   // cream header band
-const BAR_H = 0.47 * 96;    // dark footer bar
+const BAND_H = 1.75 * 96;
+const BAR_H = 0.47 * 96;
 const CONTENT_H = PAGE_H - BAND_H - BAR_H;
 
 const ZOOM_KEY = "tipolo.builder.zoom";
 const SPLIT_KEY = "tipolo.builder.split";
+
+const KIND_LABEL = {
+  schedule: "Schedule table",
+  fees: "Base scope fee table",
+  "optional-fees": "Optional scope fee table",
+  signature: "Signature block",
+};
 
 let detach = null;  // teardown for the previously mounted builder
 
@@ -54,18 +68,18 @@ export async function render(root, ctx) {
 
   /* ---------------- state ---------------- */
 
-  let sections = (p.sections || []).map((s) => ({ ...s }));
+  let blocks = normaliseSections(p.sections || []);
   let items = (p.line_items || []).map((li) => ({ ...li }));
   let title = p.title || "";
   let scope = p.project_scope || "other";
+  let part = PARTS[0].id;
   let dirty = false;
-  let activeSec = -1;
+  let activeBlk = -1;
 
   const editable = p.status === "draft";
   const subtotal = () => items.reduce((s, li) => s + lineAmount(li), 0);
-
-  // The proposal as it stands in the editor right now — what the preview draws.
-  const live = () => ({ ...p, title, project_scope: scope, sections, line_items: items });
+  const live = () => ({ ...p, title, project_scope: scope, sections: blocks, line_items: items });
+  const inPart = (i) => (blocks[i].part || "workplan") === part;
 
   /* ---------------- shell ---------------- */
 
@@ -100,7 +114,23 @@ export async function render(root, ctx) {
       </div>` : ""}
 
       <div class="builder-split">
-        <div class="pane pane-edit" id="edit"></div>
+        <div class="pane pane-edit">
+          <div class="doc-details">
+            <label>Project title
+              ${editable
+                ? `<input data-f="title" value="${escapeHtml(title)}" />`
+                : `<span class="ro">${escapeHtml(title)}</span>`}</label>
+            <label>Scope
+              ${editable
+                ? `<select data-f="project_scope">${SCOPES.map((s) =>
+                    `<option value="${s}" ${scope === s ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("")}</select>`
+                : `<span class="ro">${escapeHtml(scope)}</span>`}</label>
+            <label>Valid until
+              <span class="ro">${p.valid_until ? date(p.valid_until) : "1 year after “sent”"}</span></label>
+          </div>
+          <div class="part-nav" id="parts"></div>
+          <div class="we" id="editor"></div>
+        </div>
         <div class="splitter" data-splitter role="separator" aria-orientation="vertical"
              tabindex="0" aria-label="Resize the editor"></div>
         <div class="pane pane-preview" id="preview">
@@ -120,7 +150,8 @@ export async function render(root, ctx) {
     </div>`;
 
   const builder = root.querySelector(".builder");
-  const editPane = root.querySelector("#edit");
+  const partNav = root.querySelector("#parts");
+  const editor = root.querySelector("#editor");
   const previewPane = root.querySelector("#preview");
   const paper = root.querySelector("#paper");
   const pagesLabel = root.querySelector("[data-pages]");
@@ -129,114 +160,107 @@ export async function render(root, ctx) {
   const dirtyDot = root.querySelector("[data-dirty]");
   const split = root.querySelector(".builder-split");
 
-  /* ---------------- editor pane ---------------- */
+  /* ---------------- part navigation ---------------- */
 
-  function editorHtml() {
-    return `
-      <div class="b-card">
-        <div class="form-grid cols-2">
-          <div class="field">
-            <label class="lbl" for="b_title">Project title</label>
-            ${editable
-              ? `<input id="b_title" data-f="title" value="${escapeHtml(title)}" required />`
-              : `<div class="ro-value">${escapeHtml(title)}</div>`}
-          </div>
-          <div class="field">
-            <label class="lbl" for="b_scope">Scope</label>
-            ${editable
-              ? `<select id="b_scope" data-f="project_scope">${SCOPES.map((s) =>
-                  `<option value="${s}" ${scope === s ? "selected" : ""}>${s[0].toUpperCase() + s.slice(1)}</option>`).join("")}</select>`
-              : `<div class="ro-value">${escapeHtml(scope)}</div>`}
-          </div>
-          <div class="field">
-            <label class="lbl">Valid until</label>
-            <div class="ro-value">${p.valid_until ? date(p.valid_until)
-              : `<span class="faint">set to 1 year after “sent”</span>`}</div>
-          </div>
-          <div class="field">
-            <label class="lbl">Client</label>
-            <div class="ro-value"><a href="#/clients/${p.client?.id}">${escapeHtml(p.client?.name || "—")}</a></div>
-          </div>
-        </div>
-      </div>
+  function renderParts() {
+    partNav.innerHTML = PARTS.map((pt) => {
+      const n = blocks.filter((b) => (b.part || "workplan") === pt.id).length;
+      return `<button data-part="${pt.id}" class="${pt.id === part ? "active" : ""}">
+        ${escapeHtml(pt.label)}${n ? `<span class="n">${n}</span>` : ""}</button>`;
+    }).join("");
+  }
 
-      <div class="b-card">
-        <div class="between">
-          <h2>Sections <span class="count" data-sec-count></span></h2>
-          ${editable ? `<button class="btn subtle sm" data-add-section>+ Add section</button>` : ""}
-        </div>
-        <div id="sections"></div>
-        ${editable ? `<div class="hint" style="margin-top:10px">
-          Tokens fill themselves in on the page opposite:
-          ${TOKEN_HELP.map((t) => `<code>${escapeHtml(t)}</code>`).join(" ")}
-        </div>` : ""}
-      </div>
+  /* ---------------- the writing surface ---------------- */
 
-      <div class="b-card">
-        <div class="between">
-          <h2>Fee schedule <span class="count" data-line-count></span></h2>
-          ${editable ? `<button class="btn subtle sm" data-add-line>+ Add line</button>` : ""}
-        </div>
-        <table class="fee-table"><thead><tr>
-          <th>Description</th>
-          <th class="num" style="width:74px">Qty</th>
-          <th class="num" style="width:110px">Unit price</th>
-          <th class="num" style="width:104px">Amount</th>
-          ${editable ? `<th style="width:28px"></th>` : ""}
-        </tr></thead><tbody id="lines"></tbody></table>
-        <div class="fee-foot">
-          <span>Estimated fee <span class="faint" style="font-size:.82rem">plus applicable taxes</span></span>
-          <span class="total" data-fee-total>${money(subtotal())}</span>
-        </div>
+  function blockHtml(b, i) {
+    const lvl = b.level ?? (b.heading ? 2 : 0);
+
+    if (b.kind) {
+      return `<div class="wb wb-table ${i === activeBlk ? "on" : ""}" data-i="${i}">
+        ${tools(i, true)}
+        <div class="wb-kind">${escapeHtml(KIND_LABEL[b.kind] || b.kind)}</div>
+        ${b.kind === "schedule" ? scheduleEditor(b, i)
+          : b.kind === "optional-fees" ? optionalEditor(b, i)
+          : b.kind === "fees" ? feeEditor()
+          : `<p class="faint" style="font-size:.85rem;margin:0">
+               Signs off the agreement. Printed from your business name — nothing to edit.</p>`}
       </div>`;
+    }
+
+    return `<div class="wb ${i === activeBlk ? "on" : ""}" data-i="${i}">
+      ${tools(i)}
+      ${lvl > 0 ? `<input class="wh h${lvl}" data-k="heading" value="${escapeHtml(b.heading || "")}"
+                     placeholder="Heading ${lvl}" ${editable ? "" : "readonly"} />` : ""}
+      <textarea class="wt" data-k="body" placeholder="Write here…"
+        ${editable ? "" : "readonly"}>${escapeHtml(b.body || "")}</textarea>
+    </div>`;
   }
 
-  function renderSections() {
-    const host = root.querySelector("#sections");
-    host.innerHTML = sections.length ? sections.map((s, i) => `
-      <div class="sec-card ${i === activeSec ? "is-active" : ""}" data-i="${i}">
-        ${editable ? `
-          <div class="sec-top">
-            <input class="sec-head" data-k="heading" value="${escapeHtml(s.heading || "")}"
-                   placeholder="Section heading" />
-            <button class="icon-btn" data-move="-1" ${i === 0 ? "disabled" : ""} title="Move up" aria-label="Move up">↑</button>
-            <button class="icon-btn" data-move="1" ${i === sections.length - 1 ? "disabled" : ""} title="Move down" aria-label="Move down">↓</button>
-            <button class="icon-btn" data-del-sec title="Remove section" aria-label="Remove section">✕</button>
-          </div>
-          <textarea data-k="body" placeholder="Section text…">${escapeHtml(s.body || "")}</textarea>
-        ` : `
-          <h3>${escapeHtml(s.heading || "")}</h3>
-          <div class="ro-body">${escapeHtml(s.body || "")}</div>
-        `}
-      </div>`).join("")
-      : `<p class="faint" style="font-size:.9rem">${editable
-          ? "No sections yet — add one, or start a proposal from a template."
-          : "No sections."}</p>`;
-
-    root.querySelector("[data-sec-count]").textContent = sections.length || "";
-    host.querySelectorAll("textarea").forEach(grow);
+  function tools(i, isTable = false) {
+    if (!editable) return "";
+    const b = blocks[i];
+    const lvl = b.level ?? (b.heading ? 2 : 0);
+    return `<div class="wb-tools">
+      ${isTable ? "" : `<select data-k="level" title="Level">
+        ${LEVELS.map((l) => `<option value="${l.value}" ${lvl === l.value ? "selected" : ""}>${l.label}</option>`).join("")}
+      </select>`}
+      <button class="icon-btn" data-move="-1" title="Move up">↑</button>
+      <button class="icon-btn" data-move="1" title="Move down">↓</button>
+      <button class="icon-btn" data-del title="Delete">✕</button>
+    </div>`;
   }
 
-  function renderLines() {
-    const tbody = root.querySelector("#lines");
-    tbody.innerHTML = items.length ? items.map((li, i) => `
-      <tr data-i="${i}">
-        <td>${editable
-          ? `<input data-k="description" value="${escapeHtml(li.description || "")}" placeholder="What it covers" />`
-          : escapeHtml(li.description || "")}</td>
-        <td class="num">${editable
-          ? `<input data-k="qty" type="number" step="0.01" min="0" value="${li.qty ?? 1}" style="text-align:right" />`
-          : num(li.qty, 2)}</td>
-        <td class="num">${editable
-          ? `<input data-k="unit_price" type="number" step="0.01" min="0" value="${li.unit_price ?? 0}" style="text-align:right" />`
-          : money(li.unit_price)}</td>
-        <td class="num amt">${money(lineAmount(li))}</td>
-        ${editable ? `<td><button class="icon-btn" data-del-line="${i}" title="Remove line" aria-label="Remove line">✕</button></td>` : ""}
-      </tr>`).join("")
-      : `<tr><td colspan="${editable ? 5 : 4}" class="faint" style="text-align:center;padding:14px">No fee lines yet.</td></tr>`;
+  function scheduleEditor(b, i) {
+    return `<table class="mini"><thead><tr><th>Task</th><th>Start</th><th>Due</th><th></th></tr></thead>
+      <tbody>${(b.rows || []).map((r, j) => `<tr data-j="${j}">
+        <td><input data-rk="task" value="${escapeHtml(r.task || "")}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="start" value="${escapeHtml(r.start || "")}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="due" value="${escapeHtml(r.due || "")}" ${editable ? "" : "readonly"} /></td>
+        <td>${editable ? `<button class="icon-btn" data-del-row>✕</button>` : ""}</td></tr>`).join("")}
+      </tbody></table>
+      ${editable ? `<button class="btn link sm" data-add-row>+ Add row</button>` : ""}`;
+  }
 
-    root.querySelector("[data-line-count]").textContent = items.length || "";
-    root.querySelector("[data-fee-total]").textContent = money(subtotal());
+  function optionalEditor(b, i) {
+    return `<table class="mini"><thead><tr><th style="width:44px">Ref</th><th>Description</th><th style="width:110px">Fee</th><th></th></tr></thead>
+      <tbody>${(b.rows || []).map((r, j) => `<tr data-j="${j}">
+        <td><input data-rk="code" value="${escapeHtml(r.code || "")}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="description" value="${escapeHtml(r.description || "")}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="fee" value="${escapeHtml(r.fee || "")}" ${editable ? "" : "readonly"} /></td>
+        <td>${editable ? `<button class="icon-btn" data-del-row>✕</button>` : ""}</td></tr>`).join("")}
+      </tbody></table>
+      ${editable ? `<button class="btn link sm" data-add-row>+ Add row</button>` : ""}`;
+  }
+
+  function feeEditor() {
+    return `<table class="mini" id="lines"><thead><tr>
+        <th>Task description and timeline</th><th style="width:70px">Hrs</th>
+        <th style="width:100px">Rate</th><th style="width:96px">Fee</th><th></th>
+      </tr></thead><tbody>
+      ${items.map((li, j) => `<tr data-j="${j}">
+        <td><input data-lk="description" value="${escapeHtml(li.description || "")}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-lk="qty" type="number" step="0.5" min="0" value="${li.qty ?? 1}" style="text-align:right" ${editable ? "" : "readonly"} /></td>
+        <td><input data-lk="unit_price" type="number" step="0.01" min="0" value="${li.unit_price ?? 0}" style="text-align:right" ${editable ? "" : "readonly"} /></td>
+        <td class="amt">${money(lineAmount(li))}</td>
+        <td>${editable ? `<button class="icon-btn" data-del-line>✕</button>` : ""}</td></tr>`).join("")}
+      </tbody></table>
+      <div class="mini-foot"><span>Total</span><strong data-fee-total>${money(subtotal())}</strong></div>
+      ${editable ? `<button class="btn link sm" data-add-line>+ Add task</button>` : ""}`;
+  }
+
+  function renderEditor() {
+    const idx = blocks.map((_, i) => i).filter(inPart);
+    editor.innerHTML = idx.length
+      ? idx.map((i) => blockHtml(blocks[i], i)).join("")
+      : `<p class="faint" style="font-size:.9rem">Nothing in this part yet.</p>`;
+    if (editable) {
+      editor.innerHTML += `<div class="wb-add">
+        <button class="btn subtle sm" data-add-block>+ Add a block</button>
+        <span class="hint" style="margin:0">Tokens: ${TOKEN_HELP.slice(0, 4).map((t) => `<code>${escapeHtml(t)}</code>`).join(" ")}</span>
+      </div>`;
+    }
+    editor.querySelectorAll("textarea").forEach(grow);
+    renderParts();
   }
 
   function grow(ta) {
@@ -264,16 +288,26 @@ export async function render(root, ctx) {
   }
 
   function paintGuides() {
-    // Measure the content, not its cell: the cell is stretched to the sheet height so
-    // the footer bar lands on the bottom edge, which would feed back into the count.
     const bodyEl = paper.querySelector(".lh-body");
     const layer = paper.querySelector(".page-guides");
     if (!bodyEl || !layer) return;
     // On the narrow layout the preview pane is display:none behind the Edit tab, where
     // everything measures 0. Leave the last good count; the tab handler repaints.
     if (!previewPane.clientWidth) return;
+    const z = zoom || 1;
+    const bodyTop = bodyEl.getBoundingClientRect().top;
+
+    // `break-after: page` only acts on paper. Pad the explicit breaks out to the next
+    // page boundary so the continuous sheet falls the same way the print will.
+    paper.querySelectorAll(".pagebreak").forEach((br) => {
+      br.style.height = "0px";
+      const at = (br.getBoundingClientRect().top - bodyTop) / z;
+      const fill = (CONTENT_H - (at % CONTENT_H)) % CONTENT_H;
+      br.style.height = `${fill}px`;
+    });
+
     // getBoundingClientRect is in device pixels, so undo the zoom to get paper pixels.
-    const h = bodyEl.getBoundingClientRect().height / (zoom || 1);
+    const h = bodyEl.getBoundingClientRect().height / z;
     const pages = Math.max(1, Math.ceil(h / CONTENT_H));
 
     layer.innerHTML = "";
@@ -290,13 +324,13 @@ export async function render(root, ctx) {
   }
 
   function highlightPreview() {
-    paper.querySelectorAll(".section.hi").forEach((el) => el.classList.remove("hi"));
-    if (activeSec < 0) return;
-    paper.querySelector(`.section[data-sec="${activeSec}"]`)?.classList.add("hi");
+    paper.querySelectorAll(".hi").forEach((el) => el.classList.remove("hi"));
+    if (activeBlk < 0) return;
+    paper.querySelector(`[data-blk="${activeBlk}"]`)?.classList.add("hi");
   }
 
   function scrollPreviewTo(i) {
-    const el = paper.querySelector(`.section[data-sec="${i}"]`);
+    const el = paper.querySelector(`[data-blk="${i}"]`);
     if (!el) return;
     const top = el.getBoundingClientRect().top - previewPane.getBoundingClientRect().top
       + previewPane.scrollTop;
@@ -305,7 +339,7 @@ export async function render(root, ctx) {
 
   // Repainting the whole sheet on every keystroke is wasteful and makes the caret
   // stutter; one frame behind the typing is imperceptible and keeps input smooth.
-  const schedulePreview = debounce(paintPreview, 140);
+  const schedulePreview = debounce(paintPreview, 160);
 
   function touched() {
     dirty = true;
@@ -334,7 +368,7 @@ export async function render(root, ctx) {
     return updateProposal(p.id, {
       title: title.trim() || p.title,
       project_scope: scope,
-      sections,
+      sections: blocks,
       line_items: items,
       subtotal: Math.round(subtotal() * 100) / 100,
     });
@@ -355,6 +389,14 @@ export async function render(root, ctx) {
 
   /* ---------------- wiring ---------------- */
 
+  on(root, "click", "[data-part]", (e, btn) => {
+    part = btn.dataset.part;
+    activeBlk = -1;
+    renderEditor();
+    editor.scrollIntoView?.({ block: "nearest" });
+  });
+
+  // title / scope live in a small strip above the editor for the Cover part
   on(root, "input", "[data-f]", (e, el) => {
     const k = el.dataset.f;
     if (k === "title") {
@@ -363,68 +405,102 @@ export async function render(root, ctx) {
     } else if (k === "project_scope") scope = el.value;
     touched();
   });
-  on(root, "change", "select[data-f]", (e, el) => {
-    if (el.dataset.f === "project_scope") { scope = el.value; touched(); }
-  });
 
-  // sections
-  on(root, "input", "#sections [data-k]", (e, el) => {
-    const i = +el.closest(".sec-card").dataset.i;
-    sections[i][el.dataset.k] = el.value;
+  /* ---- blocks ---- */
+  on(root, "input", ".wb [data-k]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    blocks[i][el.dataset.k] = el.value;
     if (el.tagName === "TEXTAREA") grow(el);
     touched();
   });
-  on(root, "focusin", ".sec-card", (e, card) => {
-    const i = +card.dataset.i;
-    if (i === activeSec) return;
-    activeSec = i;
-    root.querySelectorAll(".sec-card").forEach((c) => c.classList.toggle("is-active", +c.dataset.i === i));
+  on(root, "change", ".wb select[data-k=level]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    blocks[i].level = Number(el.value);
+    if (blocks[i].level === 0) blocks[i].heading = "";
+    renderEditor();
+    touched();
+  });
+  on(root, "focusin", ".wb", (e, el) => {
+    const i = +el.dataset.i;
+    if (i === activeBlk) return;
+    activeBlk = i;
+    editor.querySelectorAll(".wb").forEach((w) => w.classList.toggle("on", +w.dataset.i === i));
     highlightPreview();
     scrollPreviewTo(i);
   });
-  on(root, "click", "[data-add-section]", () => {
-    sections.push({ heading: "", body: "" });
-    activeSec = sections.length - 1;
-    renderSections();
-    root.querySelector(`.sec-card[data-i="${activeSec}"] .sec-head`)?.focus();
+  on(root, "click", ".wb [data-move]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    const dir = Number(el.dataset.move);
+    // move within the part: swap with the next block that belongs to it
+    let j = i + dir;
+    while (j >= 0 && j < blocks.length && !inPart(j)) j += dir;
+    if (j < 0 || j >= blocks.length) return;
+    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+    activeBlk = j;
+    renderEditor();
     touched();
   });
-  on(root, "click", "[data-del-sec]", (e, el) => {
-    sections.splice(+el.closest(".sec-card").dataset.i, 1);
-    activeSec = -1;
-    renderSections();
+  on(root, "click", ".wb [data-del]", async (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    const what = blocks[i].heading || KIND_LABEL[blocks[i].kind] || "this block";
+    if (!(await confirmModal(`Delete “${what}”?`, { confirmText: "Delete" }))) return;
+    blocks.splice(i, 1);
+    activeBlk = -1;
+    renderEditor();
     touched();
   });
-  on(root, "click", "[data-move]", (e, el) => {
-    const i = +el.closest(".sec-card").dataset.i;
-    const j = i + Number(el.dataset.move);
-    if (j < 0 || j >= sections.length) return;
-    [sections[i], sections[j]] = [sections[j], sections[i]];
-    activeSec = j;
-    renderSections();
+  on(root, "click", "[data-add-block]", () => {
+    // drop it after the last block of this part so it lands where you are reading
+    let at = blocks.length;
+    for (let i = blocks.length - 1; i >= 0; i--) if (inPart(i)) { at = i + 1; break; }
+    blocks.splice(at, 0, { part, level: 2, heading: "", body: "" });
+    activeBlk = at;
+    renderEditor();
+    editor.querySelector(`.wb[data-i="${at}"] .wh`)?.focus();
     touched();
   });
 
-  // fee lines
-  on(root, "input", "#lines input", (e, el) => {
-    const i = +el.closest("tr").dataset.i;
-    const k = el.dataset.k;
-    items[i][k] = k === "description" ? el.value : Number(el.value);
+  /* ---- table rows inside blocks ---- */
+  on(root, "input", ".wb [data-rk]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    const j = +el.closest("tr").dataset.j;
+    blocks[i].rows[j][el.dataset.rk] = el.value;
+    touched();
+  });
+  on(root, "click", ".wb [data-add-row]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    const b = blocks[i];
+    b.rows = b.rows || [];
+    b.rows.push(b.kind === "schedule" ? { task: "", start: "", due: "" } : { code: "", description: "", fee: "" });
+    renderEditor();
+    touched();
+  });
+  on(root, "click", ".wb [data-del-row]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    blocks[i].rows.splice(+el.closest("tr").dataset.j, 1);
+    renderEditor();
+    touched();
+  });
+
+  /* ---- base-scope fee lines ---- */
+  on(root, "input", "#lines [data-lk]", (e, el) => {
+    const j = +el.closest("tr").dataset.j;
+    const k = el.dataset.lk;
+    items[j][k] = k === "description" ? el.value : Number(el.value);
     if (k !== "description") {
-      el.closest("tr").querySelector(".amt").textContent = money(lineAmount(items[i]));
+      el.closest("tr").querySelector(".amt").textContent = money(lineAmount(items[j]));
       root.querySelector("[data-fee-total]").textContent = money(subtotal());
     }
     touched();
   });
   on(root, "click", "[data-add-line]", () => {
     items.push({ description: "", qty: 1, unit_price: 0 });
-    renderLines();
-    root.querySelector(`#lines tr[data-i="${items.length - 1}"] input`)?.focus();
+    renderEditor();
     touched();
   });
   on(root, "click", "[data-del-line]", (e, el) => {
-    items.splice(+el.dataset.delLine, 1);
-    renderLines();
+    items.splice(+el.closest("tr").dataset.j, 1);
+    renderEditor();
     touched();
   });
 
@@ -499,7 +575,6 @@ export async function render(root, ctx) {
     catch (err) { toastErr(err.message); }
   });
 
-  // zoom
   zoomSel.addEventListener("change", () => {
     zoomMode = zoomSel.value;
     localStorage.setItem(ZOOM_KEY, zoomMode);
@@ -507,7 +582,6 @@ export async function render(root, ctx) {
     paintGuides();
   });
 
-  // narrow-screen tabs
   on(root, "click", "[data-tab-btn]", (e, btn) => {
     const t = btn.dataset.tabBtn;
     builder.dataset.tab = t;
@@ -543,7 +617,6 @@ export async function render(root, ctx) {
     splitter.addEventListener("pointermove", move);
     splitter.addEventListener("pointerup", up);
   });
-  // keyboard-accessible resize
   splitter.addEventListener("keydown", (e) => {
     const step = e.shiftKey ? 64 : 16;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
@@ -589,9 +662,7 @@ export async function render(root, ctx) {
 
   /* ---------------- first paint ---------------- */
 
-  editPane.innerHTML = editorHtml();
-  renderSections();
-  renderLines();
+  renderEditor();
   renderActions();
   applyZoom();
   paintPreview();
