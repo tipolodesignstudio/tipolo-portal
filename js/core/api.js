@@ -595,6 +595,45 @@ export async function receiptUrl(pathOrUrl) {
   return data.signedUrl;
 }
 
+/* ---------------- proposal source PDFs ---------------- */
+
+const SOURCE_BUCKET = "proposal-sources";
+
+// Stores the PDF a proposal was imported from. Returns the storage PATH.
+export async function uploadProposalSource(file) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Your session has expired — sign out and back in, then retry.");
+
+  const safe = (file.name || "proposal.pdf").replace(/[^\w.-]+/g, "-").slice(-60);
+  const path = `src-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safe}`;
+  const { error } = await supabase.storage
+    .from(SOURCE_BUCKET).upload(path, file, { upsert: false, contentType: "application/pdf" });
+  if (error) {
+    if (/Bucket not found|NoSuchBucket/i.test(error.message)) {
+      throw new Error("The `proposal-sources` bucket doesn't exist yet — run 0016_proposal_source.sql.");
+    }
+    if (/row-level security|Unauthorized|AccessDenied/i.test(error.message)) {
+      throw new Error("Storage denied the upload. Run 0016_proposal_source.sql; if it has run, " +
+        "sign out and back in.");
+    }
+    throw new Error(error.message);
+  }
+  return path;
+}
+
+export async function proposalSourceUrl(pathOrUrl) {
+  if (!pathOrUrl) return null;
+  let path = String(pathOrUrl);
+  const m = path.match(/\/object\/(?:public|sign|authenticated)\/proposal-sources\/([^?]+)/);
+  if (m) path = decodeURIComponent(m[1]);
+  else if (/^https?:\/\//.test(path)) return pathOrUrl;
+
+  const { data, error } = await supabase.storage
+    .from(SOURCE_BUCKET).createSignedUrl(path, 3600);
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}
+
 /* ---------------- proposal templates ---------------- */
 
 export async function listTemplates() {

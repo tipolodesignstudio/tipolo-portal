@@ -46,11 +46,15 @@ config.js                  Supabase URL + anon key (safe to commit)
 index.html                 app shell
 css/app.css                app styles     css/print.css   invoice/proposal print layout
 vendor/supabase-js.esm.js  vendored Supabase client (+ node-buffer-shim.mjs)
+vendor/pdf.min.mjs         vendored pdf.js (+ pdf.worker.min.mjs) — proposal PDF import
 js/app.js                  bootstrap: config check → auth gate → shell + router
-js/core/       supabase, auth, router, render, format, api
+js/core/       supabase, auth, router, render, format, api,
+               pdf-text + proposal-parse + proposal-ai (PDF import)
 js/components/  layout (shell), modal, toast
 js/views/      login, dashboard, settings, soon (placeholder for later phases)
 supabase/migrations/       SQL — run in the Supabase SQL editor, in order
+supabase/functions/        Edge Functions — deploy from the Supabase dashboard
+dev/                       local parser check (not used by the app)
 ```
 
 ## Build phases
@@ -63,8 +67,26 @@ supabase/migrations/       SQL — run in the Supabase SQL editor, in order
 | 3 | Invoices + tax + numbering | ✅ built |
 | 4 | Proposals + templates + conversion | ✅ built |
 | 5 | Expenses (project & business, re-billable) | ✅ built |
+| — | Proposal PDF import (read a PDF into a draft, or save it as a template) | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
+
+## Importing a proposal from a PDF
+
+**Proposals → Import PDF.** The PDF is read in the browser (`pdf.js` is vendored, same as
+the Supabase client) and `js/core/proposal-parse.js` turns it into a draft: title, client,
+scope, sections and fee lines. Nothing is saved until you review it and press
+**Create draft proposal** — or **Save as template**, which stores the same sections and
+fee lines under Proposals → Templates with the client's name swapped for `{{client.name}}`.
+
+**Read with AI** is an optional second pass through Claude for documents the rules can't
+read (an unfamiliar layout, or a scan with no text layer). It's hidden until the
+`parse-proposal` Edge Function is deployed — see SETUP.md §8.
+
+To check the parser against a real document, drop a PDF in `dev/` and open
+`/dev/parser-check.html?pdf=<name>`; it prints every line with its font size and the
+parse result. Files named `dev/_local-*` are git-ignored — keep real client documents
+out of the public repo.
 
 ## Notes
 

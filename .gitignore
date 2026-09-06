@@ -3,3 +3,6 @@
 .vscode/
 .idea/
 node_modules/
+
+# Real client documents used for local parser checks — never publish these
+dev/_local-*

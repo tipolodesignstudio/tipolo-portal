@@ -3,7 +3,7 @@ import { escapeHtml, money, num, date, isoDate } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
   getProposal, updateProposal, deleteProposal, setProposalStatus, convertProposal,
-  getSettings,
+  getSettings, proposalSourceUrl,
 } from "../core/api.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { TOKEN_HELP } from "../core/tokens.js";
@@ -40,6 +40,7 @@ export async function render(root, ctx) {
         <div class="faint" style="font-size:.85rem">
           <a href="#/proposals">← Proposals</a> ·
           <a href="#/clients/${p.client?.id}">${escapeHtml(p.client?.name || "client")}</a>
+          ${p.source_pdf_path ? ` · <a href="#" data-source>original PDF</a>` : ""}
         </div>
         <h1><span class="faint">${escapeHtml(p.number || "")}</span> ${escapeHtml(p.title)}
           <span class="badge ${TONE[p.status]}">${LABEL[p.status]}</span></h1>
@@ -225,6 +226,17 @@ export async function render(root, ctx) {
   });
 
   on(root, "click", "[data-print]", () => printProposal(p, settings));
+
+  // The bucket is private, so mint a signed URL. Open the tab first — doing it after
+  // the await would trip the popup blocker.
+  on(root, "click", "[data-source]", async (e) => {
+    e.preventDefault();
+    const w = window.open("", "_blank");
+    try {
+      const url = await proposalSourceUrl(p.source_pdf_path);
+      if (w) w.location = url; else window.location.href = url;
+    } catch (err) { w?.close(); toastErr(err.message); }
+  });
 
   on(root, "click", "[data-delete]", async () => {
     const ok = await confirmModal(

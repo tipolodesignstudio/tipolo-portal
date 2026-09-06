@@ -27,6 +27,7 @@ export async function render(root, ctx) {
       <div><h1>Proposals</h1><div class="muted">Every project starts here.</div></div>
       <div class="cluster">
         <a class="btn ghost" href="#/proposals/templates">Templates</a>
+        <a class="btn ghost" href="#/proposals/import">Import PDF</a>
         <button class="btn" data-new>+ New proposal</button>
       </div>
     </div>
@@ -86,7 +87,8 @@ function table(rows) {
 
 function empty() {
   return `<div class="empty"><h3>No proposals${state.status ? " with that status" : ""}</h3>
-    <p class="faint">Create a proposal to quote a client and, once accepted, start a project.</p></div>`;
+    <p class="faint">Create a proposal to quote a client and, once accepted, start a project —
+      or <a href="#/proposals/import">import one from a PDF</a>.</p></div>`;
 }
 
 /* ---- new proposal ---- */

@@ -1,0 +1,36 @@
+<!doctype html>
+<meta charset="utf-8"><title>proposal parser check</title>
+<!--
+  Local sanity check for the PDF import parser — open it at
+  http://localhost:4173/dev/parser-check.html  (add ?pdf=<name> for another file in
+  this folder). Nothing here ships with the app; it just prints what the parser reads
+  so the heuristics can be tuned against a real proposal.
+-->
+<style>body{font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;padding:16px;margin:0}
+pre{white-space:pre-wrap}</style>
+<pre id="out">running…</pre>
+<script type="module">
+  const out = document.getElementById("out");
+  const say = (s) => { out.textContent += "\n" + s; };
+  const name = new URLSearchParams(location.search).get("pdf") || "sample-proposal.pdf";
+  try {
+    const { extractPdf } = await import("../js/core/pdf-text.js");
+    const { parseProposal } = await import("../js/core/proposal-parse.js");
+    const res = await fetch("./" + name);
+    if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+    const doc = await extractPdf(await res.arrayBuffer());
+    out.textContent =
+      `${name} — pages=${doc.pageCount} bodySize=${doc.bodySize} lines=${doc.lines.length}`;
+    say("\n--- LINES (size | ^caps | text) ---");
+    say(doc.lines.map((l) => `${l.size}\t${l.caps ? "^" : " "}${l.text}`).join("\n"));
+    const clients = [
+      { id: "c1", name: "Connect Landscape Architecture", contacts: [] },
+      { id: "c2", name: "Harbourview Developments Ltd.", contacts: [{ name: "Dana Whitfield" }] },
+    ];
+    say("\n--- PARSE ---");
+    say(JSON.stringify(
+      parseProposal(doc, { clients, businessName: "Tipolo Design Studio" }), null, 2));
+  } catch (err) {
+    out.textContent = "FAIL: " + ((err && err.stack) || err);
+  }
+</script>
