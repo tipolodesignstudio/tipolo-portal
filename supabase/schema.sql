@@ -1,9 +1,4 @@
--- Tipolo Portal — full schema (Phases 0–5 + PDF import).
--- Paste into the Supabase SQL editor and Run. Safe to re-run.
-
--- ================================================================
--- migrations/0000_extensions.sql
--- ================================================================
+-- ===== 0000_extensions.sql =====
 -- 0000_extensions.sql
 -- Run first. Enables the extensions the schema relies on.
 -- Supabase projects already have most of these, but `create extension if not exists`
@@ -12,9 +7,7 @@
 create extension if not exists pgcrypto;   -- gen_random_uuid()
 create extension if not exists citext;     -- case-insensitive text (emails)
 
--- ================================================================
--- migrations/0001_core_schema.sql
--- ================================================================
+-- ===== 0001_core_schema.sql =====
 -- 0001_core_schema.sql
 -- Core tables for Phase 0 (settings + profiles) and Phase 1 (clients + projects).
 -- Later phases add time_entries / invoices / proposals in their own migration files.
@@ -141,9 +134,7 @@ create trigger projects_set_updated_at
   before update on public.projects
   for each row execute function public.set_updated_at();
 
--- ================================================================
--- migrations/0002_auth_domain_restriction.sql
--- ================================================================
+-- ===== 0002_auth_domain_restriction.sql =====
 -- 0002_auth_domain_restriction.sql
 -- Enforce that only @tipolo.ca email addresses can create accounts, and mirror every
 -- new auth user into public.profiles.
@@ -200,9 +191,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
--- ================================================================
--- migrations/0003_rls_policies.sql
--- ================================================================
+-- ===== 0003_rls_policies.sql =====
 -- 0003_rls_policies.sql
 -- Row-level security. v1 policy: any confirmed, logged-in user has full access to
 -- business data. Structured as one policy per table so tightening to roles later is
@@ -240,9 +229,7 @@ drop policy if exists projects_all on public.projects;
 create policy projects_all on public.projects
   for all to authenticated using (true) with check (true);
 
--- ================================================================
--- migrations/0004_functions.sql
--- ================================================================
+-- ===== 0004_functions.sql =====
 -- 0004_functions.sql
 -- (Numbering functions moved to 0009_numbering.sql — job number YYNNN and
 --  invoice number YYNNN-XX. This file is intentionally a no-op now; kept so the
@@ -250,9 +237,7 @@ create policy projects_all on public.projects
 
 select 1;
 
--- ================================================================
--- migrations/0005_seed_settings.sql
--- ================================================================
+-- ===== 0005_seed_settings.sql =====
 -- 0005_seed_settings.sql
 -- Creates the single app_settings row. Tax lines pre-seeded for British Columbia
 -- (5% GST + 7% PST). Business fields are left blank for Jim to fill in Settings.
@@ -270,9 +255,7 @@ values (
 )
 on conflict (id) do nothing;
 
--- ================================================================
--- migrations/0006_time_entries.sql
--- ================================================================
+-- ===== 0006_time_entries.sql =====
 -- 0006_time_entries.sql  (Phase 2)
 -- Timesheet entries. Additive — safe to run on an existing database.
 
@@ -306,9 +289,7 @@ drop policy if exists time_entries_all on public.time_entries;
 create policy time_entries_all on public.time_entries
   for all to authenticated using (true) with check (true);
 
--- ================================================================
--- migrations/0007_clients_contact.sql
--- ================================================================
+-- ===== 0007_clients_contact.sql =====
 -- 0007_clients_contact.sql  (Phase 1 revision)
 -- Clients are primarily businesses. `name` now holds the CLIENT / business name
 -- (what projects link to and what lists show). `contact_name` is the individual to
@@ -342,9 +323,7 @@ begin
   end if;
 end $$;
 
--- ================================================================
--- migrations/0008_client_address.sql
--- ================================================================
+-- ===== 0008_client_address.sql =====
 -- 0008_client_address.sql  (Phase 1 revision)
 -- Structured address on clients: street / city / province / postal_code, replacing the
 -- old single-line `address` text. Safe to run on a fresh DB or the earlier schema.
@@ -367,9 +346,7 @@ begin
   end if;
 end $$;
 
--- ================================================================
--- migrations/0009_numbering.sql
--- ================================================================
+-- ===== 0009_numbering.sql =====
 -- 0009_numbering.sql  (Phase 3 — job / invoice numbering)
 --
 -- Job number   YYNNN     e.g. 25001  (2-digit year + 3-digit sequence, resets each year)
@@ -478,9 +455,7 @@ end;
 $$;
 grant execute on function public.next_invoice_number(uuid) to authenticated;
 
--- ================================================================
--- migrations/0010_invoices.sql
--- ================================================================
+-- ===== 0010_invoices.sql =====
 -- 0010_invoices.sql  (Phase 3)
 -- One invoice belongs to one project. Number YYNNN-XX assigned on finalize.
 
@@ -529,9 +504,7 @@ begin
   end if;
 end $$;
 
--- ================================================================
--- migrations/0011_proposals.sql
--- ================================================================
+-- ===== 0011_proposals.sql =====
 -- 0011_proposals.sql  (Phase 4)
 -- Proposals are the entry point for all work: a project only exists as a converted
 -- proposal, and inherits the proposal's job number (YYNNN).
@@ -608,9 +581,7 @@ drop policy if exists proposals_all on public.proposals;
 create policy proposals_all on public.proposals
   for all to authenticated using (true) with check (true);
 
--- ================================================================
--- migrations/0012_contacts_categories.sql
--- ================================================================
+-- ===== 0012_contacts_categories.sql =====
 -- 0012_contacts_categories.sql  (Phase 1 revision)
 -- Multiple contacts per client; a managed list of client categories.
 
@@ -686,9 +657,7 @@ drop policy if exists client_contacts_all on public.client_contacts;
 create policy client_contacts_all on public.client_contacts
   for all to authenticated using (true) with check (true);
 
--- ================================================================
--- migrations/0013_client_notes_category.sql
--- ================================================================
+-- ===== 0013_client_notes_category.sql =====
 -- 0013_client_notes_category.sql  (Phase 1 revision — CRM)
 -- One category per client (was a multi-value array). Notes become a dated timeline:
 -- each edit is a new entry, older entries are the client's history/archive.
@@ -763,9 +732,7 @@ drop policy if exists client_notes_all on public.client_notes;
 create policy client_notes_all on public.client_notes
   for all to authenticated using (true) with check (true);
 
--- ================================================================
--- migrations/0014_expenses.sql
--- ================================================================
+-- ===== 0014_expenses.sql =====
 -- 0014_expenses.sql  (Phase 5)
 -- Project and business expenses. Billable expenses can be pulled onto a project's
 -- invoice (with optional markup), like unbilled time.
@@ -822,9 +789,7 @@ drop policy if exists expenses_all on public.expenses;
 create policy expenses_all on public.expenses
   for all to authenticated using (true) with check (true);
 
--- ================================================================
--- migrations/0015_storage_policies.sql
--- ================================================================
+-- ===== 0015_storage_policies.sql =====
 -- 0015_storage_policies.sql  (Phase 5)
 -- Storage access for the app's buckets. Uploads/edits/deletes are limited to
 -- authenticated (@tipolo.ca) users. `receipts` should be a PRIVATE bucket — the app
@@ -858,9 +823,7 @@ create policy "branding update" on storage.objects for update to authenticated
 create policy "branding delete" on storage.objects for delete to authenticated
   using (bucket_id = 'branding');
 
--- ================================================================
--- migrations/0016_proposal_source.sql
--- ================================================================
+-- ===== 0016_proposal_source.sql =====
 -- 0016_proposal_source.sql  (PDF import)
 -- Keeps the originating PDF alongside a proposal that was imported from one.
 -- `source_pdf_path` stores the object PATH inside the private `proposal-sources`
@@ -887,3 +850,9 @@ create policy "proposal sources update" on storage.objects for update to authent
   using (bucket_id = 'proposal-sources');
 create policy "proposal sources delete" on storage.objects for delete to authenticated
   using (bucket_id = 'proposal-sources');
+
+-- ===== 0017_signature.sql =====
+-- 0017: the signature image that sits between "Sincerely," and the name on a proposal's
+-- cover letter. Stored in the same public `branding` bucket as the logo.
+alter table public.app_settings add column if not exists signature_url text;
+

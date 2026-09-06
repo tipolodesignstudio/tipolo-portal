@@ -33,10 +33,24 @@ export async function getSettings() {
 }
 
 export async function saveSettings(patch) {
-  return unwrap(
-    await supabase.from("app_settings")
-      .update(patch).eq("id", 1).select().single()
-  );
+  const write = (body) => supabase.from("app_settings").update(body).eq("id", 1).select().single();
+  const res = await write(patch);
+  // A column the database has not got yet (0017 not run) shouldn't take the whole
+  // Settings page down — drop it and save the rest, then say so.
+  if (res.error && /column .* does not exist|Could not find the '.*' column/i.test(res.error.message)) {
+    const missing = /'([^']+)'|column "?([\w.]+)"?/.exec(res.error.message);
+    const col = (missing?.[1] || missing?.[2] || "").split(".").pop();
+    if (col && col in patch) {
+      const { [col]: _drop, ...rest } = patch;
+      const retry = await write(rest);
+      if (!retry.error) {
+        throw Object.assign(
+          new Error(`Saved, but "${col}" needs migration 0017 run in Supabase first.`),
+          { partial: true, settings: retry.data });
+      }
+    }
+  }
+  return unwrap(res);
 }
 
 function defaultSettings() {
@@ -715,12 +729,17 @@ export async function convertProposal(proposal, { status = "lead", start_date = 
 
 /* ---------------- storage (branding logo) ---------------- */
 
-export async function uploadLogo(file) {
+export async function uploadLogo(file) { return uploadBranding(file, "logo"); }
+
+// The cover letter's signature image — same public bucket, different prefix.
+export async function uploadSignature(file) { return uploadBranding(file, "signature"); }
+
+async function uploadBranding(file, prefix) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error("Your session has expired — sign out and back in, then retry.");
 
   const ext = (file.name.split(".").pop() || "png").toLowerCase();
-  const path = `logo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+  const path = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
   const { error } = await supabase.storage
     .from("branding").upload(path, file, { cacheControl: "3600" });
   if (error) {

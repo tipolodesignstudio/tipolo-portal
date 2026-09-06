@@ -866,3 +866,10 @@ table.mini input[type=date] { font-variant-numeric: tabular-nums; }
 .recip dd { margin: 0; color: var(--ink); }
 .recip dd.b { font-weight: 500; }
 .recip dd.gap { color: var(--ink-faint); font-style: italic; }
+
+/* "start on a new page" toggle in a block's tools */
+.wb-tools .brk {
+  display: flex; align-items: center; gap: 3px;
+  font-size: .68rem; color: var(--ink-faint); cursor: pointer; padding: 0 2px;
+}
+.wb-tools .brk input { width: auto; margin: 0; }

@@ -63,17 +63,10 @@
   min-height: 0;
   padding: 26px var(--lh-margin) 18px;
 }
-.doc.letterhead .lh-foot { position: relative; flex: none; }
-/* Page number, bottom right at the margin, sitting above the contact bar —
-   the PAGE field in the letterhead's footer. */
-.doc.letterhead .pageno {
-  position: absolute;
-  right: var(--lh-margin);
-  bottom: calc(0.47in + 5pt);
-  font-size: 8.5pt;
-  color: var(--lh-muted);
-  font-variant-numeric: tabular-nums;
-}
+.doc.letterhead .lh-foot { flex: none; }
+/* The page number sits on the contact line, right margin — same baseline, same size,
+   same colour as hello@tipolo.ca. */
+.doc.letterhead .pageno { font-variant-numeric: tabular-nums; }
 /* The probe paginate() measures in is never shown. */
 .pagination-probe .sheet-page { height: auto; }
 
@@ -109,7 +102,7 @@
   font-size: 9pt;
   line-height: 1.35;
 }
-.doc .lh-fields .k { font-weight: 300; color: var(--lh-label); }
+.doc .lh-fields .k { font-weight: 400; color: var(--lh-label); }
 .doc .lh-fields .v { font-weight: 500; color: var(--lh-label); }
 
 .doc .lh-brand { text-align: right; padding-top: 1pt; }
@@ -131,9 +124,10 @@
   color: var(--lh-cream);
   display: flex;
   align-items: center;
+  justify-content: space-between;   /* contact left, page number right */
   padding: 0 var(--lh-margin);
   font-size: 8pt;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: .01em;
 }
 
@@ -188,7 +182,16 @@
   margin: 0 0 12pt;
 }
 .doc .closing { margin: 14pt 0 0; }
-.doc .signoff { margin: 18pt 0 0; }
+/* Three lines of room after "Sincerely," for the signature; the image sits in it when
+   one has been uploaded in Settings, and the space stays either way. */
+.doc .sig-slot {
+  height: 3.2em;
+  margin-top: 2pt;
+  display: flex;
+  align-items: center;
+}
+.doc .sig-slot img { max-height: 100%; max-width: 2.6in; object-fit: contain; object-position: left; }
+.doc .signoff { margin: 4pt 0 0; }
 .doc .signoff b { font-weight: 700; }
 /* Read by paginate(): the cover letter owns page 1, the proposal starts overleaf. */
 .doc .pagebreak { height: 0; }
@@ -295,14 +298,21 @@
 .doc table.fees tr.total td { border-bottom: none; border-top: 1.2px solid var(--lh-bark); font-weight: 500; }
 .doc table.fees, .doc table.sched { margin-left: 18pt; width: calc(100% - 18pt); }
 
-/* ---------- signature block ---------- */
+/* ---------- agreement signature block ----------
+   Room to sign above each rule, and the caption ("Client", "Designer", "Date")
+   underneath it. */
 .doc .sig { margin-top: 16pt; }
-.doc .sig p { margin-bottom: 16pt; }
-.doc .sig-row { display: flex; align-items: flex-end; gap: 10pt; margin-bottom: 14pt; max-width: 3.6in; }
-.doc .sig-row.short { max-width: 2.2in; }
-.doc .sig-row .rule { flex: 1; border-bottom: 1px solid var(--lh-label); height: 12pt; }
-.doc .sig-row .name { flex: 1; border-bottom: 1px solid var(--lh-label); height: 12pt; }
-.doc .sig-row .cap { flex: none; font-size: 8pt; color: var(--lh-muted); }
+.doc .sig p { margin-bottom: 10pt; }
+.doc .sig-set { display: flex; gap: 26pt; margin-top: 18pt; }
+.doc .sig-field { flex: 1; max-width: 3.1in; }
+.doc .sig-field.short { max-width: 1.7in; }
+.doc .sig-over {
+  height: 3.2em;                     /* three lines of clear space to sign in */
+  display: flex; align-items: flex-end;
+  border-bottom: 1px solid var(--lh-label);
+  padding-bottom: 2pt;
+}
+.doc .sig-cap { font-size: 8pt; color: var(--lh-muted); padding-top: 3pt; }
 
 /* ---------- invoice-only bits ---------- */
 .doc .parties { display: flex; gap: 40px; margin: 20px 0 26px; font-size: 10.5pt; }

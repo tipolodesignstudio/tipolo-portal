@@ -12,8 +12,9 @@
 //           2 = "Task 1: …"        10.6pt
 //           3 = "Deliverables"      9.1pt bold
 //           0 = body copy, no heading
-//   kind    schedule | fees | optional-fees | signature — rendered as a table or chart
+//   kind    schedule | fees | optional-fees | payment | signature — table or chart
 //           the schedule block also carries scale: "week" | "day" for the gantt
+//   breakBefore  start this block on a fresh page
 //
 // In body text a line starting "• " is a bullet and each two leading spaces before it
 // is one more level of indent, matching the source document's 18pt steps.
@@ -88,17 +89,30 @@ const WORKPLAN = [
 
 const SCHEDULE = [
   { part: "schedule", level: 1, heading: "Project Schedule" },
-  // Dates start empty: a date input only takes YYYY-MM-DD, and until some are set the
-  // schedule prints as a plain table rather than an empty chart. "Project Start" has no
-  // due date on purpose — a row without one plots as a milestone diamond.
-  { part: "schedule", kind: "schedule", scale: "week", rows: [
-    { task: "Project Start", start: "", due: "" },
-    { task: "Task 1: [Task Name]", start: "", due: "" },
-    { task: "Task 2: [Task Name]", start: "", due: "" },
-    { task: "Task 3: [Task Name]", start: "", due: "" },
-    { task: "Task 4: [Task Name]", start: "", due: "" },
-  ] },
+  // Seeded with a six-week shape off the next Monday so the chart is real from the
+  // start — placeholder dates, like the placeholder text. "Project Start" has no due
+  // date on purpose: a row without one plots as a milestone diamond.
+  { part: "schedule", kind: "schedule", scale: "week", rows: scheduleSeed() },
 ];
+
+// Monday of next week, then week offsets from it.
+function scheduleSeed() {
+  const mon = new Date();
+  mon.setHours(0, 0, 0, 0);
+  mon.setDate(mon.getDate() + ((8 - mon.getDay()) % 7 || 7));   // the coming Monday
+  const at = (weeks, days = 0) => {
+    const d = new Date(mon);
+    d.setDate(d.getDate() + weeks * 7 + days);
+    return d.toISOString().slice(0, 10);
+  };
+  return [
+    { task: "Project Start", start: at(0), due: "" },
+    { task: "Task 1: [Task Name]", start: at(0), due: at(0, 4) },
+    { task: "Task 2: [Task Name]", start: at(1), due: at(2, 4) },
+    { task: "Task 3: [Task Name]", start: at(3), due: at(5, 4) },
+    { task: "Task 4: [Task Name]", start: at(4), due: at(5, 4) },
+  ];
+}
 
 /* ------------------------------------------------------------------- design fees */
 
@@ -123,11 +137,14 @@ const FEES = [
   { part: "fees", level: 2, heading: "Hourly Rate ([Year])", body:
 `• Principal Designer: $[00.00]/hour ($[000] per day)` },
 
-  { part: "fees", level: 2, heading: "Payment Schedule", body:
-`• 20% down payment to initiate work - $[0.00]
-• 30% due upon approval of Task 2 [Task Name]/Final Presentation - $[0.00]
-• 50% due before [final deliverable] - $[0.00]
-• Optional Scopes are due upon completion of the specific task.` },
+  { part: "fees", level: 2, heading: "Payment Schedule" },
+  // Percentages are edited; the amounts are worked out from the A. Base Scope total.
+  { part: "fees", kind: "payment", rows: [
+    { pct: 20, label: "down payment to initiate work" },
+    { pct: 30, label: "due upon approval of Task 2 [Task Name]/Final Presentation" },
+    { pct: 50, label: "due before [final deliverable]" },
+    { pct: "", label: "Optional Scopes are due upon completion of the specific task." },
+  ] },
 
   { part: "fees", level: 2, heading: "Payment Procedures", body:
 `• Cheques shall be made payable to "Jim Dema-ala" and be delivered to the address specified on the invoice or handed in person; or
@@ -138,7 +155,7 @@ const FEES = [
    House boilerplate — kept word for word. Every clause is still editable per proposal. */
 
 const AGREEMENT = [
-  { part: "agreement", level: 1, heading: "Design Services Agreement", body:
+  { part: "agreement", level: 1, breakBefore: true, heading: "Design Services Agreement", body:
 `This agreement (the "Design Services Agreement") is made on "Date" by and between [Client Legal Name] as the "Client", and Tipolo Design Studio as the "Designer". In consideration of the mutual agreement made herein, both parties agree as follows:` },
 
   { part: "agreement", level: 3, heading: "Work", body:

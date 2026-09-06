@@ -89,12 +89,11 @@ function prose(text, map, blkTag = "") {
   return out.join("");
 }
 
-// The schedule prints as a gantt chart. Until dates are filled in there is nothing to
-// plot, so it falls back to the plain task/start/due table rather than an empty grid.
+// The schedule always prints as a gantt chart. With no dates set it draws the frame and
+// says so, rather than dropping back to a table.
 function scheduleTable(rows = [], scale = "week") {
   if (!rows.length) return "";
   const g = buildGantt(rows, scale);
-  if (!g) return plainSchedule(rows);
 
   const head = g.scale === "day"
     ? `${g.weeks.map((w) => `<div class="g-wk" style="grid-row:1;grid-column:${2 + w.startCol}/span ${w.span}">
@@ -126,18 +125,21 @@ function scheduleTable(rows = [], scale = "week") {
       <div class="g-corner" style="grid-row:1/span ${headRows};grid-column:1">Task</div>
       ${head}${body}
     </div>
-    ${g.truncated ? `<p class="g-note">Chart truncated — the schedule runs past the columns shown.</p>` : ""}`;
+    ${g.truncated ? `<p class="g-note">Chart truncated — the schedule runs past the columns shown.</p>` : ""}
+    ${g.undated ? `<p class="g-note"><span class="ph">[Set the task dates to plot the schedule.]</span></p>` : ""}`;
 }
 
-function plainSchedule(rows) {
-  return `<table class="sched"><thead><tr>
-      <th>Task</th><th class="dt">Start</th><th class="dt">Due</th>
-    </tr></thead><tbody>
-    ${rows.map((r) => `<tr>
-      <td>${esc(r.task)}</td>
-      <td class="dt">${escapeHtml(r.start || "")}</td>
-      <td class="dt">${escapeHtml(r.due || "")}</td></tr>`).join("")}
-  </tbody></table>`;
+// Percentages are typed; the amounts follow the Base Scope total so they can never
+// drift from the fee table above them.
+function paymentTable(rows = [], subtotal = 0) {
+  if (!rows.length) return "";
+  return rows.map((r) => {
+    const pct = r.pct === "" || r.pct == null ? null : Number(r.pct);
+    const amount = pct == null ? "" : ` - ${money(subtotal * pct / 100)}`;
+    return `<div class="li lvl0"><span class="mk">•</span><span class="tx">`
+      + `${pct == null ? "" : `${num(pct, pct % 1 ? 1 : 0)}% `}${esc(r.label)}${amount}`
+      + `</span></div>`;
+  }).join("");
 }
 
 function feeTable(items) {
@@ -171,12 +173,22 @@ function optionalTable(rows = []) {
 
 function signatureBlock(settings) {
   const designer = settings.business_name || "Tipolo Design Studio";
+  // Room to sign above each rule, and the caption underneath it.
+  const line = (cap, over = "", cls = "") =>
+    `<div class="sig-field ${cls}">
+       <div class="sig-over">${over ? escapeHtml(over) : ""}</div>
+       <div class="sig-cap">${escapeHtml(cap)}</div>
+     </div>`;
   return `<div class="sig">
     <p>Agreed,</p>
-    <div class="sig-row"><span class="rule"></span><span class="cap">Client</span></div>
-    <div class="sig-row short"><span class="rule"></span><span class="cap">Date</span></div>
-    <div class="sig-row named"><span class="name">Jim Dema-ala, ${escapeHtml(designer)}</span><span class="cap">Designer</span></div>
-    <div class="sig-row short"><span class="rule"></span><span class="cap">Date</span></div>
+    <div class="sig-set">
+      ${line("Client")}
+      ${line("Date", "", "short")}
+    </div>
+    <div class="sig-set">
+      ${line("Designer", `Jim Dema-ala, ${designer}`)}
+      ${line("Date", "", "short")}
+    </div>
   </div>`;
 }
 
@@ -208,7 +220,10 @@ export function proposalDocHtml(p, settings = {}) {
       </div>
     </div>`;
 
-  const foot = `<div class="lh-bar"><span>${escapeHtml(CONTACT)}</span></div>`;
+  // The page number rides on the contact line itself, at the right margin.
+  const foot = (n) => `<div class="lh-bar">
+      <span>${escapeHtml(CONTACT)}</span><span class="pageno">${n}</span>
+    </div>`;
 
   /* ---- cover letter: the addressee and RE: line come from the record ---- */
 
@@ -232,6 +247,8 @@ export function proposalDocHtml(p, settings = {}) {
     <p class="re">RE: ${esc((p.title || "").toUpperCase())}</p>
     ${cover.map(([b, i]) => prose(b.body, map, ` data-blk="${i}"`)).join("")}
     <p class="closing">Sincerely,</p>
+    <div class="sig-slot">${settings.signature_url
+      ? `<img src="${escapeHtml(settings.signature_url)}" alt="" />` : ""}</div>
     <p class="signoff"><b>Jim Dema-ala</b>, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
     <div class="pagebreak"></div>`;
 
@@ -243,16 +260,22 @@ export function proposalDocHtml(p, settings = {}) {
   const rest = blocks.map((b, i) => [b, i]).filter(([b]) => (b.part || "workplan") !== "cover")
     .map(([b, i]) => {
       const tag = ` data-blk="${i}"`;
-      if (b.kind === "schedule") return `<div class="unit"${tag}>${scheduleTable(b.rows, b.scale)}</div>`;
-      if (b.kind === "fees") return `<div class="unit"${tag}>${feeTable(items)}</div>`;
-      if (b.kind === "optional-fees") return `<div class="unit"${tag}>${optionalTable(b.rows)}</div>`;
-      if (b.kind === "signature") return `<div class="unit"${tag}>${signatureBlock(settings)}</div>`;
+      // "Start on a new page" on a heading block
+      const brk = b.breakBefore ? `<div class="pagebreak"></div>` : "";
+      if (b.kind === "schedule") return brk + `<div class="unit"${tag}>${scheduleTable(b.rows, b.scale)}</div>`;
+      if (b.kind === "fees") return brk + `<div class="unit"${tag}>${feeTable(items)}</div>`;
+      if (b.kind === "optional-fees") return brk + `<div class="unit"${tag}>${optionalTable(b.rows)}</div>`;
+      if (b.kind === "signature") return brk + `<div class="unit"${tag}>${signatureBlock(settings)}</div>`;
+      if (b.kind === "payment") {
+        const sub = items.reduce((t, li) => t + lineAmount(li), 0);
+        return brk + `<div class="unit"${tag}>${paymentTable(b.rows, sub)}</div>`;
+      }
 
       const lvl = b.level ?? (b.heading ? 2 : 0);
       const h = b.heading
         ? `<h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}${tag}>${esc(resolveTokens(b.heading, map))}</h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}>`
         : "";
-      return h + prose(b.body, map, tag);
+      return brk + h + prose(b.body, map, tag);
     }).join("");
 
   /* ---- lay it onto Letter pages ---- */
@@ -262,10 +285,7 @@ export function proposalDocHtml(p, settings = {}) {
     <div class="sheet-page">
       ${head}
       <div class="lh-body">${units.join("")}</div>
-      <div class="lh-foot">
-        <span class="pageno">${n + 1}</span>
-        ${foot}
-      </div>
+      <div class="lh-foot">${foot(n + 1)}</div>
     </div>`).join("");
 
   return `<div class="doc letterhead">${sheets}</div>`;

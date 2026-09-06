@@ -38,6 +38,7 @@ const ZOOM_KEY = "tipolo.builder.zoom";
 const SPLIT_KEY = "tipolo.builder.split";
 
 const KIND_LABEL = {
+  payment: "Payment schedule",
   schedule: "Schedule table",
   fees: "Base scope fee table",
   "optional-fees": "Optional scope fee table",
@@ -175,7 +176,8 @@ export async function render(root, ctx) {
       return `<div class="wb wb-table ${i === activeBlk ? "on" : ""}" data-i="${i}">
         ${tools(i, true)}
         <div class="wb-kind">${escapeHtml(KIND_LABEL[b.kind] || b.kind)}</div>
-        ${b.kind === "schedule" ? scheduleEditor(b, i)
+        ${b.kind === "payment" ? paymentEditor(b, i)
+          : b.kind === "schedule" ? scheduleEditor(b, i)
           : b.kind === "optional-fees" ? optionalEditor(b, i)
           : b.kind === "fees" ? feeEditor()
           : `<p class="faint" style="font-size:.85rem;margin:0">
@@ -206,10 +208,38 @@ export async function render(root, ctx) {
       ${isTable ? "" : `<select data-k="level" title="Level">
         ${LEVELS.map((l) => `<option value="${l.value}" ${lvl === l.value ? "selected" : ""}>${l.label}</option>`).join("")}
       </select>`}
+      <label class="brk" title="Start this block on a new page">
+        <input type="checkbox" data-brk ${b.breakBefore ? "checked" : ""} /> page
+      </label>
       <button class="icon-btn" data-move="-1" title="Move up">↑</button>
       <button class="icon-btn" data-move="1" title="Move down">↓</button>
       <button class="icon-btn" data-del title="Delete">✕</button>
     </div>`;
+  }
+
+  // Percentages are typed; the amount is worked out from the Base Scope total, so the
+  // two can never disagree.
+  function paymentEditor(b, i) {
+    const sub = subtotal();
+    const pcts = (b.rows || []).reduce((t, r) => t + (Number(r.pct) || 0), 0);
+    return `<table class="mini"><thead><tr>
+        <th style="width:66px">%</th><th>Milestone</th><th style="width:96px">Amount</th><th></th>
+      </tr></thead>
+      <tbody>${(b.rows || []).map((r, j) => `<tr data-j="${j}">
+        <td><input data-rk="pct" type="number" step="0.5" min="0" max="100"
+             value="${r.pct === "" || r.pct == null ? "" : r.pct}" placeholder="—"
+             style="text-align:right" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="label" value="${escapeHtml(r.label || "")}" ${editable ? "" : "readonly"} /></td>
+        <td class="amt">${r.pct === "" || r.pct == null ? "—" : money(sub * Number(r.pct) / 100)}</td>
+        <td>${editable ? `<button class="icon-btn" data-del-row>✕</button>` : ""}</td></tr>`).join("")}
+      </tbody></table>
+      ${editable ? `<button class="btn link sm" data-add-row>+ Add milestone</button>` : ""}
+      <div class="mini-foot">
+        <span><span data-pct-sum>${pcts}</span>% of ${money(sub)} (A. Base Scope)</span>
+        <strong data-pct-total>${money(sub * pcts / 100)}</strong>
+      </div>
+      <p class="hint" data-pct-warn style="margin-top:6px" ${pcts === 100 ? "hidden" : ""}>
+        The percentages don't add up to 100%.</p>`;
   }
 
   function scheduleEditor(b, i) {
@@ -426,6 +456,11 @@ export async function render(root, ctx) {
     if (el.tagName === "TEXTAREA") grow(el);
     touched();
   });
+  on(root, "change", ".wb [data-brk]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    blocks[i].breakBefore = el.checked;
+    touched();
+  });
   on(root, "change", ".wb select[data-k=level]", (e, el) => {
     const i = +el.closest(".wb").dataset.i;
     blocks[i].level = Number(el.value);
@@ -475,10 +510,30 @@ export async function render(root, ctx) {
 
   /* ---- table rows inside blocks ---- */
   // `change` as well as `input`: a date picked from the calendar popup fires change.
+  // Amounts and the running total follow the percentages without a re-render, so the
+  // caret stays where it is.
+  function refreshPayment(blk, host, sub) {
+    let pcts = 0;
+    (blk.rows || []).forEach((r, ri) => {
+      const cell = host.querySelector(`tr[data-j="${ri}"] .amt`);
+      const v = r.pct === "" || r.pct == null ? null : Number(r.pct);
+      if (v != null) pcts += v;
+      if (cell) cell.textContent = v == null ? "—" : money(sub * v / 100);
+    });
+    const sum = host.querySelector("[data-pct-sum]");
+    if (sum) sum.textContent = num(pcts, pcts % 1 ? 1 : 0);
+    const tot = host.querySelector("[data-pct-total]");
+    if (tot) tot.textContent = money(sub * pcts / 100);
+    const warn = host.querySelector("[data-pct-warn]");
+    if (warn) warn.hidden = Math.abs(pcts - 100) < 0.001;
+  }
+
   const rowEdit = (e, el) => {
     const i = +el.closest(".wb").dataset.i;
     const j = +el.closest("tr").dataset.j;
-    blocks[i].rows[j][el.dataset.rk] = el.value;
+    const k = el.dataset.rk;
+    blocks[i].rows[j][k] = k === "pct" ? (el.value === "" ? "" : Number(el.value)) : el.value;
+    if (k === "pct") refreshPayment(blocks[i], el.closest(".wb"), subtotal());
     touched();
   };
   on(root, "input", ".wb [data-rk]", rowEdit);
@@ -493,7 +548,9 @@ export async function render(root, ctx) {
     const i = +el.closest(".wb").dataset.i;
     const b = blocks[i];
     b.rows = b.rows || [];
-    b.rows.push(b.kind === "schedule" ? { task: "", start: "", due: "" } : { code: "", description: "", fee: "" });
+    b.rows.push(b.kind === "schedule" ? { task: "", start: "", due: "" }
+      : b.kind === "payment" ? { pct: "", label: "" }
+      : { code: "", description: "", fee: "" });
     renderEditor();
     touched();
   });
@@ -571,8 +628,16 @@ export async function render(root, ctx) {
     const k = el.dataset.lk;
     items[j][k] = k === "description" ? el.value : Number(el.value);
     if (k !== "description") {
+      const sub = subtotal();
       el.closest("tr").querySelector(".amt").textContent = money(lineAmount(items[j]));
-      root.querySelector("[data-fee-total]").textContent = money(subtotal());
+      root.querySelector("[data-fee-total]").textContent = money(sub);
+      // the payment milestones are percentages of this total — keep them in step
+      blocks.forEach((blk, bi) => {
+        if (blk.kind !== "payment") return;
+        const host = editor.querySelector(`.wb[data-i="${bi}"]`);
+        if (!host) return;
+        refreshPayment(blk, host, sub);
+      });
     }
     touched();
   });

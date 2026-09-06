@@ -39,6 +39,7 @@ That one file bundles every migration:
 | `0014_expenses.sql` | Expenses + expense categories (Phase 5) |
 | `0015_storage_policies.sql` | Storage access — private `receipts`, authenticated writes |
 | `0016_proposal_source.sql` | PDF import: keeps the original PDF on the proposal (creates the private `proposal-sources` bucket) |
+| `0017_signature.sql` | Cover-letter signature image on Settings |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,

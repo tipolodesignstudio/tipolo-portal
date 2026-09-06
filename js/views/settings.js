@@ -2,7 +2,7 @@
 import { escapeHtml, setCurrency } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
-  getSettings, saveSettings, uploadLogo,
+  getSettings, saveSettings, uploadLogo, uploadSignature,
   listCategories, createCategory, updateCategory, deleteCategory,
   listExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
 } from "../core/api.js";
@@ -62,6 +62,26 @@ export async function render(root, ctx) {
           ${s.logo_url ? `<button type="button" class="btn link" id="logo-clear">Remove</button>` : ""}
         </div>
         <div class="hint">Requires a public Storage bucket named <code>branding</code> (see SETUP.md).</div>
+      </div>
+
+      <div class="card">
+        <h2>Signature</h2>
+        <div class="muted" style="margin-bottom:10px">
+          Printed on a proposal's cover letter, between “Sincerely,” and your name.
+          A PNG with a transparent background works best.
+        </div>
+        <div class="cluster">
+          <div id="sig-preview" style="width:190px;height:70px;border:1px solid var(--border);
+               border-radius:8px;display:grid;place-items:center;background:var(--bg);overflow:hidden">
+            ${s.signature_url ? `<img src="${escapeHtml(s.signature_url)}" style="max-width:100%;max-height:100%">`
+                              : `<span class="faint" style="font-size:.8rem">No signature</span>`}
+          </div>
+          <label class="btn subtle sm">
+            Upload image<input type="file" id="sig-file" accept="image/*" hidden />
+          </label>
+          <input type="hidden" name="signature_url" value="${escapeHtml(s.signature_url || "")}" />
+          ${s.signature_url ? `<button type="button" class="btn link" id="sig-clear">Remove</button>` : ""}
+        </div>
       </div>
 
       <div class="card">
@@ -167,6 +187,24 @@ export async function render(root, ctx) {
       `<span class="faint" style="font-size:.8rem">No logo</span>`;
   });
 
+  const sigInput = root.querySelector("#sig-file");
+  sigInput?.addEventListener("change", async () => {
+    const file = sigInput.files[0];
+    if (!file) return;
+    try {
+      const url = await uploadSignature(file);
+      root.querySelector("[name=signature_url]").value = url;
+      root.querySelector("#sig-preview").innerHTML =
+        `<img src="${escapeHtml(url)}" style="max-width:100%;max-height:100%">`;
+      toastOk("Signature uploaded — Save to keep it");
+    } catch (err) { toastErr("Upload failed: " + err.message); }
+  });
+  root.querySelector("#sig-clear")?.addEventListener("click", () => {
+    root.querySelector("[name=signature_url]").value = "";
+    root.querySelector("#sig-preview").innerHTML =
+      `<span class="faint" style="font-size:.8rem">No signature</span>`;
+  });
+
   root.querySelector("#settings-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector("button[type=submit]");
@@ -181,6 +219,7 @@ export async function render(root, ctx) {
       gst_number: fd.get("gst_number") || null,
       pst_number: fd.get("pst_number") || null,
       logo_url: fd.get("logo_url") || null,
+      signature_url: fd.get("signature_url") || null,
       default_hourly_rate: fd.get("default_hourly_rate") ? Number(fd.get("default_hourly_rate")) : null,
       job_seq_year: Math.max(2000, Number(fd.get("job_seq_year")) || new Date().getFullYear()),
       job_seq_next: Math.max(1, Number(fd.get("job_seq_next")) || 1),

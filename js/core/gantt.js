@@ -6,7 +6,9 @@
 //
 // Dates are ISO (YYYY-MM-DD). A row with a start but no due is a milestone (a diamond
 // rather than a bar) — that is how "Project Start" reads in the source proposal.
-// Returns null when nothing has a date yet, so the caller can fall back to a plain table.
+// The schedule always draws as a chart. With no dates set yet it still returns a frame —
+// task rows against a default six-week window — rather than nothing, so the proposal
+// never falls back to a plain table.
 
 const DAY = 86400000;
 const MAX_WEEK_COLS = 30;
@@ -47,10 +49,10 @@ export function buildGantt(rows = [], scale = "week") {
   }));
 
   const dates = items.flatMap((i) => [i.start, i.due]).filter(Boolean);
-  if (!dates.length) return null;
+  const undated = !dates.length;
 
-  const first = new Date(Math.min(...dates));
-  const last = new Date(Math.max(...dates));
+  const first = undated ? new Date() : new Date(Math.min(...dates));
+  const last = undated ? addDays(first, 5 * 7) : new Date(Math.max(...dates));
   const mon0 = mondayOf(first);
   const weekCount = weeksBetween(mon0, last) + 1;
 
@@ -102,5 +104,5 @@ export function buildGantt(rows = [], scale = "week") {
     };
   });
 
-  return { scale, colCount, weeks, cols, bars, truncated };
+  return { scale, colCount, weeks, cols, bars, truncated, undated };
 }
