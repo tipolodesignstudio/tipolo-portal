@@ -2,7 +2,7 @@
 //
 // This runs entirely in the browser on the structural model from pdf-text.js. It is
 // tuned for Tipolo's own proposals (InDesign / Word exports with a consistent layout);
-// when it comes up short the import screen offers the AI pass in proposal-ai.js.
+// when it comes up short, the import screen's review form is filled in by hand.
 //
 //   parseProposal(doc, { clients }) -> draft (see shape at the bottom of this file)
 

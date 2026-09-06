@@ -49,11 +49,10 @@ vendor/supabase-js.esm.js  vendored Supabase client (+ node-buffer-shim.mjs)
 vendor/pdf.min.mjs         vendored pdf.js (+ pdf.worker.min.mjs) — proposal PDF import
 js/app.js                  bootstrap: config check → auth gate → shell + router
 js/core/       supabase, auth, router, render, format, api,
-               pdf-text + proposal-parse + proposal-ai (PDF import)
+               pdf-text + proposal-parse (PDF import)
 js/components/  layout (shell), modal, toast
 js/views/      login, dashboard, settings, soon (placeholder for later phases)
 supabase/migrations/       SQL — run in the Supabase SQL editor, in order
-supabase/functions/        Edge Functions — deploy from the Supabase dashboard
 dev/                       local parser check (not used by the app)
 ```
 
@@ -79,9 +78,9 @@ scope, sections and fee lines. Nothing is saved until you review it and press
 **Create draft proposal** — or **Save as template**, which stores the same sections and
 fee lines under Proposals → Templates with the client's name swapped for `{{client.name}}`.
 
-**Read with AI** is an optional second pass through Claude for documents the rules can't
-read (an unfamiliar layout, or a scan with no text layer). It's hidden until the
-`parse-proposal` Edge Function is deployed — see SETUP.md §8.
+Everything is read in your browser — the PDF is never sent anywhere. A document laid out
+unlike your usual proposals, or a scan with no text layer, will come back mostly empty;
+fill the review screen in by hand from there.
 
 To check the parser against a real document, drop a PDF in `dev/` and open
 `/dev/parser-check.html?pdf=<name>`; it prints every line with its font size and the

@@ -146,35 +146,6 @@ Open `https://portal.tipolo.ca` → the sign-in screen loads over HTTPS → sign
 
 ---
 
-## 8. The AI proposal reader (optional)
-
-**Proposals → Import PDF** works without this: it reads the PDF in your browser and
-fills in the review screen. The **“Read with AI”** button on that screen is extra — it
-sends the document to Claude for a second, more thorough read. It stays hidden until you
-deploy the function below, so you can skip this section entirely.
-
-Use it when a PDF isn't laid out like your usual proposals, or when it's a scan with no
-selectable text. Roughly **1–3¢ per proposal**.
-
-1. **Get an API key** at <https://console.anthropic.com> → **API Keys** → *Create key*.
-   Add a little credit under **Billing**.
-2. **Deploy the function.** Supabase → **Edge Functions** → *Deploy a new function* →
-   *Via editor*. Name it exactly **`parse-proposal`**. Delete the sample code, paste all
-   of **`supabase/functions/parse-proposal/index.ts`** from this folder, and click
-   **Deploy**. Leave **Verify JWT** ON — that's what stops anyone but signed-in staff
-   from using your API credit.
-3. **Add the key as a secret.** Edge Functions → **Secrets** → *Add new secret*:
-   name `ANTHROPIC_API_KEY`, value the key from step 1. Save.
-   *(Optional: `ANTHROPIC_MODEL` to pin a different model — it defaults to
-   `claude-sonnet-5`.)*
-
-Reload the portal; **Read with AI** now appears on the import screen. The key lives only
-in Supabase — it is never sent to the browser.
-
-To turn the feature off again, delete the function (the button disappears on its own).
-
----
-
 ## Adding a staff member
 Until a custom SMTP sender is configured (Authentication → Emails → SMTP Settings), the
 built-in mailer is rate-limited and self-signup confirmation emails may not arrive. Add

@@ -10,7 +10,6 @@ import {
 } from "../core/api.js";
 import { extractPdf } from "../core/pdf-text.js";
 import { parseProposal, matchClient } from "../core/proposal-parse.js";
-import { aiParseProposal, aiAvailable } from "../core/proposal-ai.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { toastOk, toastErr } from "../components/toast.js";
 import { openModal, confirmModal } from "../components/modal.js";
@@ -34,13 +33,6 @@ export async function render(root, ctx) {
   let doc = null;       // extracted text model
   let draft = null;     // what the reader produced (then edited by hand)
   let dirty = false;    // has the draft been hand-edited since it was read?
-  let aiOk = false;
-
-  aiAvailable().then((v) => {
-    aiOk = v;
-    const btn = root.querySelector("[data-ai]");
-    if (btn) btn.hidden = !v;
-  });
 
   root.innerHTML = `
     <div class="page-head">
@@ -67,8 +59,8 @@ export async function render(root, ctx) {
         </div>
         <input type="file" accept="application/pdf,.pdf" id="pdf" hidden />
         <div class="hint" style="margin-top:12px">
-          Works best on PDFs with selectable text (exported from InDesign, Word or Pages).
-          A scan with no text layer needs the AI reader.
+          Needs a PDF with selectable text (exported from InDesign, Word or Pages).
+          A scan has nothing to read, so it comes back blank.
         </div>
       </div>`;
 
@@ -115,8 +107,8 @@ export async function render(root, ctx) {
 
     if (doc.text.trim().length < 200) {
       draft.warnings.unshift(
-        "This PDF has almost no text layer — it's probably a scan. " +
-        "The local reader can't do much with it; try “Read with AI”.");
+        "This PDF has almost no text layer — it's probably a scan, so there was " +
+        "nothing to read. Fill the fields in by hand, or re-export the PDF with text.");
     }
     reviewStep();
   }
@@ -151,7 +143,6 @@ export async function render(root, ctx) {
         <span class="faint">From <strong>${escapeHtml(file.name)}</strong>
           · ${doc.pageCount} page${doc.pageCount === 1 ? "" : "s"}</span>
         <span style="flex:1"></span>
-        <button class="btn ghost sm" data-ai ${aiOk ? "" : "hidden"}>Read with AI</button>
         <button class="btn ghost sm" data-restart>Choose another PDF</button>
       </div>
 
@@ -159,7 +150,6 @@ export async function render(root, ctx) {
         <strong>Check these:</strong>
         <ul style="margin:6px 0 0 18px">${draft.warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join("")}</ul>
       </div>` : ""}
-      ${draft.notes ? `<div class="alert info" style="margin-bottom:16px">${escapeHtml(draft.notes)}</div>` : ""}
 
       <div class="card">
         <div class="form-grid cols-2">
@@ -316,54 +306,6 @@ export async function render(root, ctx) {
       { confirmText: "Discard" }))) return;
     file = null; doc = null; draft = null; dirty = false;
     pickStep();
-  });
-
-  /* ---- AI pass ---- */
-  on(root, "click", "[data-ai]", async (e, btn) => {
-    if (dirty && !(await confirmModal(
-      "The AI reader replaces everything on this screen with what it reads. Your edits will be lost.",
-      { confirmText: "Read anyway", danger: false }))) return;
-
-    btn.disabled = true;
-    const label = btn.textContent;
-    btn.innerHTML = `<span class="spinner"></span>`;
-    try {
-      const ai = await aiParseProposal({ text: doc.text, file, clients });
-      const match = ai.client_id && clients.some((c) => c.id === ai.client_id)
-        ? { client: clients.find((c) => c.id === ai.client_id), score: 1 }
-        : matchClient(ai.client_name, clients);
-
-      draft = {
-        title: ai.title || "",
-        client_name: ai.client_name || "",
-        client_id: match.client?.id || "",
-        project_scope: ai.project_scope || "other",
-        sections: (ai.sections || []).map((s) => ({ ...s })),
-        line_items: (ai.line_items || []).map((li) => ({ ...li })),
-        subtotal: ai.subtotal || 0,
-        dated: ai.dated || "",
-        valid_until: ai.valid_until || "",
-        notes: ai.notes || "",
-        conf: {
-          title: ai.title ? 0.9 : 0,
-          client_name: match.client ? 0.9 : ai.client_name ? 0.6 : 0,
-          project_scope: 0.85,
-          sections: ai.sections?.length ? 0.9 : 0,
-          line_items: ai.line_items?.length ? 0.9 : 0,
-        },
-        warnings: [],
-      };
-      if (!draft.title) draft.warnings.push("The reader found no project title.");
-      if (!draft.client_name) draft.warnings.push("The reader found no client name.");
-      if (!draft.line_items.length) draft.warnings.push("The reader found no fee lines.");
-      dirty = false;
-      reviewStep();
-      toastOk("Read with AI — check the fields below.");
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = label;
-      toastErr(err.message);
-    }
   });
 
   /* ---- save the read document as a reusable template ---- */
