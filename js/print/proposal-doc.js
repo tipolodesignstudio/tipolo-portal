@@ -31,6 +31,13 @@ import { paginate } from "./paginate.js";
 const TAGLINE = "Port Moody, BC • tipolo.ca";
 const CONTACT = "hello@tipolo.ca | 604.729.0597";
 
+// Anything still in [brackets] is unfilled, so it prints red — impossible to send by
+// accident without noticing. Escaping happens first; this only wraps the result.
+function marks(escaped) {
+  return escaped.replace(/\[[^\[\]]*\]/g, (m) => `<span class="ph">${m}</span>`);
+}
+const esc = (t) => marks(escapeHtml(t ?? ""));
+
 /* Body copy -> paragraphs and lists.
 
    A line beginning "• ", "- ", "1. " or "a) " is a list item; two leading spaces (or a
@@ -54,7 +61,7 @@ function prose(text, map, blkTag = "") {
 
     const flushText = () => {
       if (!buf.length) return;
-      out.push(`<p${blkTag}>${buf.map((l) => escapeHtml(l.trim())).join("<br>")}</p>`);
+      out.push(`<p${blkTag}>${buf.map((l) => esc(l.trim())).join("<br>")}</p>`);
       buf = [];
     };
     const flushList = () => { out.push(...items); items = []; };
@@ -66,11 +73,11 @@ function prose(text, map, blkTag = "") {
         const marker = /^[-*]$/.test(m[2]) ? "•" : m[2];
         items.push(`<div class="li lvl${indentOf(m[1])}"${blkTag}>`
           + `<span class="mk">${escapeHtml(marker)}</span>`
-          + `<span class="tx">${escapeHtml(m[3])}</span></div>`);
+          + `<span class="tx">${esc(m[3])}</span></div>`);
       } else if (items.length && CONT_RE.test(line)) {
         // wrapped continuation of the item above
         items[items.length - 1] = items[items.length - 1]
-          .replace(/<\/span><\/div>$/, ` ${escapeHtml(line.trim())}</span></div>`);
+          .replace(/<\/span><\/div>$/, ` ${esc(line.trim())}</span></div>`);
       } else {
         flushList();
         buf.push(line);
@@ -103,7 +110,7 @@ function scheduleTable(rows = [], scale = "week") {
     const cells = Array.from({ length: g.colCount }, (_, c) =>
       `<div class="g-cell${(c + 1) % (g.scale === "day" ? 5 : 1) === 0 ? " wk-end" : ""}"
             style="grid-row:${row};grid-column:${2 + c}"></div>`).join("");
-    const label = `<div class="g-task" style="grid-row:${row};grid-column:1">${escapeHtml(b.task)}</div>`;
+    const label = `<div class="g-task" style="grid-row:${row};grid-column:1">${esc(b.task)}</div>`;
     if (b.empty) return label + cells;
     const bar = b.milestone
       ? `<div class="g-mile" style="grid-row:${row};grid-column:${2 + b.startCol}">
@@ -127,7 +134,7 @@ function plainSchedule(rows) {
       <th>Task</th><th class="dt">Start</th><th class="dt">Due</th>
     </tr></thead><tbody>
     ${rows.map((r) => `<tr>
-      <td>${escapeHtml(r.task || "")}</td>
+      <td>${esc(r.task)}</td>
       <td class="dt">${escapeHtml(r.start || "")}</td>
       <td class="dt">${escapeHtml(r.due || "")}</td></tr>`).join("")}
   </tbody></table>`;
@@ -141,7 +148,7 @@ function feeTable(items) {
     </tr></thead><tbody>
     ${items.map((li, i) => `<tr>
       <td class="ix">${i + 1}</td>
-      <td>${escapeHtml(li.description || "")}</td>
+      <td>${esc(li.description)}</td>
       <td class="fee">${money(lineAmount(li))}</td></tr>`).join("")}
     <tr class="total">
       <td class="ix"></td>
@@ -156,9 +163,9 @@ function optionalTable(rows = []) {
       <th class="ix"></th><th>Description</th><th class="fee">Fee</th>
     </tr></thead><tbody>
     ${rows.map((r) => `<tr>
-      <td class="ix">${escapeHtml(r.code || "")}</td>
-      <td>${escapeHtml(r.description || "")}</td>
-      <td class="fee">${escapeHtml(r.fee || "")}</td></tr>`).join("")}
+      <td class="ix">${esc(r.code)}</td>
+      <td>${esc(r.description)}</td>
+      <td class="fee">${esc(r.fee)}</td></tr>`).join("")}
   </tbody></table>`;
 }
 
@@ -191,7 +198,7 @@ export function proposalDocHtml(p, settings = {}) {
         <div class="lh-doctype">Proposal</div>
         <div class="lh-fields">
           <span class="k">No.</span><span class="v">${escapeHtml(p.number || "DRAFT")}</span>
-          <span class="k">Project</span><span class="v">${escapeHtml(p.title || "")}</span>
+          <span class="k">Project</span><span class="v">${esc(p.title)}</span>
           <span class="k">Date</span><span class="v">${escapeHtml(longDate(p.sent_date || p.created_at || new Date()))}</span>
         </div>
       </div>
@@ -205,19 +212,27 @@ export function proposalDocHtml(p, settings = {}) {
 
   /* ---- cover letter: the addressee and RE: line come from the record ---- */
 
-  const addressee = [
-    contact ? [contact.name, contact.title].filter(Boolean).join(" | ") : c.name,
-    [c.street, c.city, c.province].filter(Boolean).join(", "),
-    [contact?.email || c.email, contact?.phone || c.phone].filter(Boolean).join(" | "),
-  ].filter(Boolean);
-
+  // Recipient, in the order Jim writes them:
+  //   name (bold) / position, company / street / city, province / email | phone
+  // Everything comes from the client record so it cannot go stale; the builder's
+  // Cover Letter tab edits that record in place when a line is missing.
   const cover = blocks.map((b, i) => [b, i]).filter(([b]) => (b.part || "workplan") === "cover");
+  const person = c.is_individual ? null : contact;
+  const recipient = [
+    { cls: "who", text: (person?.name || c.name || "") },
+    { text: [person?.title, c.is_individual ? "" : c.name].filter(Boolean).join(", ") },
+    { text: c.street ? `${c.street},` : "" },
+    { text: [c.city, c.province].filter(Boolean).join(", ") },
+    { text: [person?.email || c.email, person?.phone || c.phone].filter(Boolean).join(" | ") },
+  ].filter((l) => l.text);
+
   const coverHtml = `
-    <div class="addressee">${addressee.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}</div>
-    <p class="re">RE: ${escapeHtml((p.title || "").toUpperCase())}</p>
+    <div class="addressee">${recipient.map((l) =>
+      `<div${l.cls ? ` class="${l.cls}"` : ""}>${esc(l.text)}</div>`).join("")}</div>
+    <p class="re">RE: ${esc((p.title || "").toUpperCase())}</p>
     ${cover.map(([b, i]) => prose(b.body, map, ` data-blk="${i}"`)).join("")}
     <p class="closing">Sincerely,</p>
-    <p class="signoff">Jim Dema-ala, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
+    <p class="signoff"><b>Jim Dema-ala</b>, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
     <div class="pagebreak"></div>`;
 
   /* ---- everything after the cover ----
@@ -235,7 +250,7 @@ export function proposalDocHtml(p, settings = {}) {
 
       const lvl = b.level ?? (b.heading ? 2 : 0);
       const h = b.heading
-        ? `<h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}${tag}>${escapeHtml(resolveTokens(b.heading, map))}</h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}>`
+        ? `<h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}${tag}>${esc(resolveTokens(b.heading, map))}</h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}>`
         : "";
       return h + prose(b.body, map, tag);
     }).join("");

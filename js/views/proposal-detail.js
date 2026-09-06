@@ -14,7 +14,7 @@ import { escapeHtml, money, num, date, debounce } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
   getProposal, updateProposal, deleteProposal, setProposalStatus, convertProposal,
-  getSettings, proposalSourceUrl,
+  getSettings, proposalSourceUrl, updateClient, saveClientContacts, clientPrimaryContact,
 } from "../core/api.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { TOKEN_HELP } from "../core/tokens.js";
@@ -269,9 +269,35 @@ export async function render(root, ctx) {
       ${editable ? `<button class="btn link sm" data-add-line>+ Add task</button>` : ""}`;
   }
 
+  // The letter is addressed from the client record, so the Cover Letter tab shows what
+  // will print and lets the record be corrected without leaving the proposal.
+  function recipientPanel() {
+    const c = p.client || {};
+    const person = c.is_individual ? null : clientPrimaryContact(c);
+    const lines = [
+      { k: "Name", v: person?.name || c.name || "", bold: true },
+      { k: "Position, Company", v: [person?.title, c.is_individual ? "" : c.name].filter(Boolean).join(", ") },
+      { k: "Street", v: c.street || "" },
+      { k: "City, Province", v: [c.city, c.province].filter(Boolean).join(", ") },
+      { k: "Email | Phone", v: [person?.email || c.email, person?.phone || c.phone].filter(Boolean).join(" | ") },
+    ];
+    const missing = lines.filter((l) => !l.v).length;
+    return `<div class="recip">
+      <div class="between" style="margin-bottom:8px">
+        <h2>Addressed to</h2>
+        ${editable ? `<button class="btn subtle sm" data-edit-recipient>Edit details</button>` : ""}
+      </div>
+      <dl>${lines.map((l) => `<dt>${escapeHtml(l.k)}</dt>
+        <dd class="${l.v ? (l.bold ? "b" : "") : "gap"}">${l.v ? escapeHtml(l.v) : "not set"}</dd>`).join("")}</dl>
+      ${missing ? `<p class="hint" style="margin-top:8px">${missing} line${missing === 1 ? "" : "s"}
+        missing — they are simply left out of the letter until filled in.</p>` : ""}
+    </div>`;
+  }
+
   function renderEditor() {
     const idx = blocks.map((_, i) => i).filter(inPart);
-    editor.innerHTML = idx.length
+    editor.innerHTML = (part === "cover" ? recipientPanel() : "");
+    editor.innerHTML += idx.length
       ? idx.map((i) => blockHtml(blocks[i], i)).join("")
       : `<p class="faint" style="font-size:.9rem">Nothing in this part yet.</p>`;
     if (editable) {
@@ -559,6 +585,54 @@ export async function render(root, ctx) {
     items.splice(+el.closest("tr").dataset.j, 1);
     renderEditor();
     touched();
+  });
+
+  on(root, "click", "[data-edit-recipient]", async () => {
+    const c = p.client || {};
+    const person = clientPrimaryContact(c);
+    const res = await openModal({
+      title: `Recipient details — ${c.name || "client"}`,
+      confirmText: "Save to client",
+      body: `<form class="form-grid">
+        <div class="hint">Saved on the client record, so every proposal for
+          ${escapeHtml(c.name || "them")} uses it.</div>
+        <div class="form-grid cols-2">
+          ${field("contact_name", "Name", person?.name || "", { ph: "Ken Larsson" })}
+          ${field("contact_title", "Position", person?.title || "", { ph: "Sr. Principal" })}
+        </div>
+        ${field("street", "Street address", c.street || "", { ph: "2305 Hemlock Street" })}
+        <div class="form-grid cols-2">
+          ${field("city", "City", c.city || "", { ph: "Vancouver" })}
+          ${field("province", "Province", c.province || "", { ph: "BC" })}
+        </div>
+        <div class="form-grid cols-2">
+          ${field("email", "Email", person?.email || c.email || "", { type: "email" })}
+          ${field("phone", "Phone", person?.phone || c.phone || "")}
+        </div>
+      </form>`,
+      onConfirm: (dlg) => Object.fromEntries(new FormData(dlg.querySelector("form"))),
+    });
+    if (!res) return;
+    try {
+      await updateClient(c.id, {
+        street: res.street.trim() || null,
+        city: res.city.trim() || null,
+        province: res.province.trim() || null,
+        email: res.email.trim() || null,
+        phone: res.phone.trim() || null,
+      });
+      if (res.contact_name.trim()) {
+        await saveClientContacts(c.id, [{
+          ...(person?.id ? { id: person.id } : {}),
+          name: res.contact_name, title: res.contact_title,
+          email: res.email, phone: res.phone, is_primary: true,
+        }]);
+      }
+      p = await getProposal(p.id);      // reread so the letter and preview agree
+      renderEditor();
+      paintPreview();
+      toastOk("Recipient updated");
+    } catch (err) { toastErr(err.message); }
   });
 
   on(root, "click", "[data-save]", save);

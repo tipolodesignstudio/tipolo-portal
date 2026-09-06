@@ -828,9 +828,12 @@ table.mini .icon-btn:hover { background: var(--border-soft); color: var(--ink); 
 .wb-add { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
 
 /* the block your cursor is in, echoed on the sheet */
+/* The block the cursor is in, echoed on the page. A tint rather than a marker in the
+   margin — that read as a stray glyph next to the heading. */
 .doc [data-blk].hi {
-  box-shadow: -10px 0 0 -7px var(--accent);
-  transition: box-shadow .18s;
+  background: rgba(var(--accent-rgb), .07);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .07);
+  border-radius: 2px;
 }
 
 /* schedule scale toggle in the builder */
@@ -851,3 +854,15 @@ table.mini input[type=date] { font-variant-numeric: tabular-nums; }
   border-radius: 5px; padding: 2px 8px; font-size: .72rem; cursor: pointer; line-height: 1.5;
 }
 .wb-format button:hover { background: var(--bg-alt); color: var(--ink); border-color: var(--border); }
+
+/* who the letter is addressed to, shown above the Cover Letter blocks */
+.recip {
+  border: 1px solid var(--border); background: var(--card-bg);
+  border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px;
+}
+.recip h2 { font-size: .95rem; margin: 0; }
+.recip dl { display: grid; grid-template-columns: 132px 1fr; gap: 4px 12px; font-size: .85rem; margin: 0; }
+.recip dt { color: var(--ink-faint); font-size: .78rem; }
+.recip dd { margin: 0; color: var(--ink); }
+.recip dd.b { font-weight: 500; }
+.recip dd.gap { color: var(--ink-faint); font-style: italic; }
