@@ -1,9 +1,10 @@
 /* Print-only rules. Loaded with media="print".
    The document's own styling lives in document.css, which loads for every medium so
-   the builder's preview pane and the printed page are laid out by the same rules.
+   the builder's preview and the printed page are laid out by the same rules — and,
+   since js/print/paginate.js builds explicit 8.5x11 sheets, are the same pages.
 
    Zero page margin because the letterhead's band and bar bleed to the paper edge; the
-   0.75in text margins are applied inside the document instead. */
+   0.75in text margins are applied inside the document. */
 
 @page { size: Letter; margin: 0; }
 
@@ -15,8 +16,10 @@
     inset: 0;
     background: #fff;
   }
-  /* Ask for the band and bar to be painted rather than dropped as "background". */
-  #print-root .lh-band, #print-root .lh-bar {
+  /* Ask for the bands, bars and gantt bars to be painted rather than dropped
+     as "background graphics". */
+  #print-root .lh-band, #print-root .lh-bar,
+  #print-root .g-bar, #print-root .g-mile i {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

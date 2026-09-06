@@ -30,13 +30,9 @@ const TONE = { draft: "grey", sent: "amber", accepted: "green", declined: "red" 
 const LABEL = { draft: "Draft", sent: "Sent", accepted: "Accepted", declined: "Declined" };
 const SCOPES = ["landscape", "multimedia", "other"];
 
-// Letter at 96dpi. The letterhead's band and bar repeat on every printed page, so the
-// room left for body copy is what remains between them.
-const PAGE_H = 11 * 96;
+// Page geometry lives in the paginator; the preview only needs the sheet width for
+// the "Fit" zoom.
 const PAGE_W = 8.5 * 96;
-const BAND_H = 1.75 * 96;
-const BAR_H = 0.47 * 96;
-const CONTENT_H = PAGE_H - BAND_H - BAR_H;
 
 const ZOOM_KEY = "tipolo.builder.zoom";
 const SPLIT_KEY = "tipolo.builder.split";
@@ -193,6 +189,12 @@ export async function render(root, ctx) {
                      placeholder="Heading ${lvl}" ${editable ? "" : "readonly"} />` : ""}
       <textarea class="wt" data-k="body" placeholder="Write here…"
         ${editable ? "" : "readonly"}>${escapeHtml(b.body || "")}</textarea>
+      ${editable ? `<div class="wb-format">
+        <button data-fmt="bullet" title="Bullet list">• List</button>
+        <button data-fmt="number" title="Numbered list">1. List</button>
+        <button data-fmt="outdent" title="Outdent (Shift+Tab)">⇤</button>
+        <button data-fmt="indent" title="Indent (Tab)">⇥</button>
+      </div>` : ""}
     </div>`;
   }
 
@@ -301,45 +303,11 @@ export async function render(root, ctx) {
   }
 
   function paintPreview() {
-    paper.innerHTML = proposalDocHtml(live(), settings) + `<div class="page-guides"></div>`;
-    paintGuides();
+    // proposalDocHtml() returns finished 8.5x11 sheets, so the preview is the pages.
+    paper.innerHTML = proposalDocHtml(live(), settings);
+    const n = paper.querySelectorAll(".sheet-page").length;
+    pagesLabel.textContent = `${n} page${n === 1 ? "" : "s"}`;
     highlightPreview();
-  }
-
-  function paintGuides() {
-    const bodyEl = paper.querySelector(".lh-body");
-    const layer = paper.querySelector(".page-guides");
-    if (!bodyEl || !layer) return;
-    // On the narrow layout the preview pane is display:none behind the Edit tab, where
-    // everything measures 0. Leave the last good count; the tab handler repaints.
-    if (!previewPane.clientWidth) return;
-    const z = zoom || 1;
-    const bodyTop = bodyEl.getBoundingClientRect().top;
-
-    // `break-after: page` only acts on paper. Pad the explicit breaks out to the next
-    // page boundary so the continuous sheet falls the same way the print will.
-    paper.querySelectorAll(".pagebreak").forEach((br) => {
-      br.style.height = "0px";
-      const at = (br.getBoundingClientRect().top - bodyTop) / z;
-      const fill = (CONTENT_H - (at % CONTENT_H)) % CONTENT_H;
-      br.style.height = `${fill}px`;
-    });
-
-    // getBoundingClientRect is in device pixels, so undo the zoom to get paper pixels.
-    const h = bodyEl.getBoundingClientRect().height / z;
-    const pages = Math.max(1, Math.ceil(h / CONTENT_H));
-
-    layer.innerHTML = "";
-    for (let n = 1; n < pages; n++) {
-      const g = document.createElement("div");
-      g.className = "guide";
-      g.style.top = `${BAND_H + n * CONTENT_H}px`;
-      g.innerHTML = `<span>Page ${n + 1}</span>`;
-      layer.append(g);
-    }
-    // A fixed height (not min-height) so the sheet's footer bar sits on the bottom edge.
-    paper.style.height = `${BAND_H + pages * CONTENT_H + BAR_H}px`;
-    pagesLabel.textContent = `${pages} page${pages === 1 ? "" : "s"}`;
   }
 
   function highlightPreview() {
@@ -510,6 +478,67 @@ export async function render(root, ctx) {
     touched();
   });
 
+  /* ---- list formatting, applied to the selected lines ---- */
+
+  const MARKER = /^([ \t]*)([•\-*]|\d+[.)]|[A-Za-z][.)])[ \t]+/;
+
+  function formatLines(ta, action) {
+    const v = ta.value;
+    const from = v.lastIndexOf("\n", Math.max(0, ta.selectionStart - 1)) + 1;
+    let to = v.indexOf("\n", ta.selectionEnd);
+    if (to === -1) to = v.length;
+
+    const lines = v.slice(from, to).split("\n");
+    let out;
+
+    if (action === "indent" || action === "outdent") {
+      out = lines.map((l) => action === "indent"
+        ? `  ${l}`
+        : l.replace(/^ {1,2}|^\t/, ""));
+    } else if (action === "bullet") {
+      // already all bullets -> strip them, so the button toggles
+      const allBullets = lines.every((l) => /^[ \t]*[•\-*][ \t]+/.test(l) || !l.trim());
+      out = lines.map((l) => {
+        if (!l.trim()) return l;
+        const ws = l.match(/^[ \t]*/)[0];
+        const text = l.replace(MARKER, "").trim();
+        return allBullets ? ws + text : `${ws}• ${text}`;
+      });
+    } else {
+      const allNumbered = lines.every((l) => /^[ \t]*\d+[.)][ \t]+/.test(l) || !l.trim());
+      let n = 0;
+      out = lines.map((l) => {
+        if (!l.trim()) return l;
+        const ws = l.match(/^[ \t]*/)[0];
+        const text = l.replace(MARKER, "").trim();
+        return allNumbered ? ws + text : `${ws}${++n}. ${text}`;
+      });
+    }
+
+    const next = out.join("\n");
+    ta.setRangeText(next, from, to, "select");   // keeps undo history intact
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    ta.focus();
+  }
+
+  on(root, "click", ".wb-format button", (e, btn) => {
+    e.preventDefault();
+    const ta = btn.closest(".wb").querySelector("textarea");
+    if (ta) formatLines(ta, btn.dataset.fmt);
+  });
+
+  // Tab indents a list item, the way it does in a word processor. Only on list lines,
+  // so Tab still moves between fields everywhere else.
+  on(root, "keydown", ".wb textarea", (e, ta) => {
+    if (e.key !== "Tab") return;
+    const from = ta.value.lastIndexOf("\n", Math.max(0, ta.selectionStart - 1)) + 1;
+    const line = ta.value.slice(from, ta.value.indexOf("\n", from) === -1
+      ? ta.value.length : ta.value.indexOf("\n", from));
+    if (!MARKER.test(line)) return;
+    e.preventDefault();
+    formatLines(ta, e.shiftKey ? "outdent" : "indent");
+  });
+
   /* ---- base-scope fee lines ---- */
   on(root, "input", "#lines [data-lk]", (e, el) => {
     const j = +el.closest("tr").dataset.j;
@@ -607,14 +636,13 @@ export async function render(root, ctx) {
     zoomMode = zoomSel.value;
     localStorage.setItem(ZOOM_KEY, zoomMode);
     applyZoom();
-    paintGuides();
   });
 
   on(root, "click", "[data-tab-btn]", (e, btn) => {
     const t = btn.dataset.tabBtn;
     builder.dataset.tab = t;
     root.querySelectorAll("[data-tab-btn]").forEach((b) => b.classList.toggle("active", b === btn));
-    if (t === "preview") { applyZoom(); paintGuides(); }
+    if (t === "preview") applyZoom();
   });
 
   /* ---- splitter drag ---- */
@@ -640,7 +668,6 @@ export async function render(root, ctx) {
       splitter.removeEventListener("pointerup", up);
       localStorage.setItem(SPLIT_KEY, split.style.getPropertyValue("--edit-w"));
       applyZoom();
-      paintGuides();
     };
     splitter.addEventListener("pointermove", move);
     splitter.addEventListener("pointerup", up);
@@ -654,7 +681,7 @@ export async function render(root, ctx) {
     const px = Math.min(Math.max(cur + (e.key === "ArrowRight" ? step : -step), 340), box.width - 380);
     split.style.setProperty("--edit-w", `${px}px`);
     localStorage.setItem(SPLIT_KEY, `${px}px`);
-    applyZoom(); paintGuides();
+    applyZoom();
   });
 
   /* ---- window-level listeners, torn down when the view is swapped out ---- */
@@ -672,7 +699,7 @@ export async function render(root, ctx) {
 
   const ro = new ResizeObserver(debounce(() => {
     if (!root.isConnected) return cleanup();
-    if (zoomMode === "fit") { applyZoom(); paintGuides(); }
+    if (zoomMode === "fit") applyZoom();
   }, 120));
   ro.observe(previewPane);
 

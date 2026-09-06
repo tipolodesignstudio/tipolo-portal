@@ -23,6 +23,7 @@ import { buildTokenMap, resolveTokens } from "../core/tokens.js";
 import { clientPrimaryContact } from "../core/api.js";
 import { normaliseSections } from "../core/proposal-template.js";
 import { buildGantt } from "../core/gantt.js";
+import { paginate } from "./paginate.js";
 
 // Set verbatim from the letterhead. Settings has no field that matches these two
 // lines (its `email` is the accounts address, not the one printed here), so they live
@@ -30,27 +31,55 @@ import { buildGantt } from "../core/gantt.js";
 const TAGLINE = "Port Moody, BC • tipolo.ca";
 const CONTACT = "hello@tipolo.ca | 604.729.0597";
 
-/* Body copy: blank lines separate paragraphs; a line starting "• " is a bullet, and
-   each two spaces in front of it steps the indent in one more level (18pt), the way
-   the source document nests its lists. "1." and "A." lead lines keep their marker. */
-function prose(text, map) {
+/* Body copy -> paragraphs and lists.
+
+   A line beginning "• ", "- ", "1. " or "a) " is a list item; two leading spaces (or a
+   tab) step it in one level, matching the source document's 18pt indents. A following
+   line that is indented but carries no marker is the same item wrapped onto a second
+   line, not a new one — that is what the builder's Bullet/Number buttons produce and
+   what a writer types by hand. Prose and lists can sit in the same paragraph. */
+const LIST_RE = /^([ \t]*)([•\u2022\-*]|\d+[.)]|[A-Za-z][.)])[ \t]+(.*)$/;
+const CONT_RE = /^[ \t]+\S/;
+
+const indentOf = (ws) => Math.min(Math.floor(ws.replace(/\t/g, "  ").length / 2), 3);
+
+function prose(text, map, blkTag = "") {
   const src = resolveTokens(text || "", map);
   if (!src.trim()) return "";
-  return src.split(/\n{2,}/).map((para) => {
-    const lines = para.split("\n");
-    const isList = lines.every((l) => /^\s*(?:[•\-*]|\d+\.|[A-Z]\.)\s/.test(l));
-    if (!isList) {
-      return `<p>${lines.map((l) => escapeHtml(l.trim())).join("<br>")}</p>`;
+  const out = [];
+
+  for (const para of src.split(/\n{2,}/)) {
+    let buf = [];      // plain lines waiting to become a <p>
+    let items = [];    // the run of list items being built
+
+    const flushText = () => {
+      if (!buf.length) return;
+      out.push(`<p${blkTag}>${buf.map((l) => escapeHtml(l.trim())).join("<br>")}</p>`);
+      buf = [];
+    };
+    const flushList = () => { out.push(...items); items = []; };
+
+    for (const line of para.split("\n")) {
+      const m = line.match(LIST_RE);
+      if (m) {
+        flushText();
+        const marker = /^[-*]$/.test(m[2]) ? "•" : m[2];
+        items.push(`<div class="li lvl${indentOf(m[1])}"${blkTag}>`
+          + `<span class="mk">${escapeHtml(marker)}</span>`
+          + `<span class="tx">${escapeHtml(m[3])}</span></div>`);
+      } else if (items.length && CONT_RE.test(line)) {
+        // wrapped continuation of the item above
+        items[items.length - 1] = items[items.length - 1]
+          .replace(/<\/span><\/div>$/, ` ${escapeHtml(line.trim())}</span></div>`);
+      } else {
+        flushList();
+        buf.push(line);
+      }
     }
-    return lines.map((l) => {
-      const indent = Math.floor((l.match(/^ */)[0].length) / 2);
-      const m = l.trim().match(/^([•\-*]|\d+\.|[A-Z]\.)\s+(.*)$/);
-      const marker = m[1] === "-" || m[1] === "*" ? "•" : m[1];
-      return `<div class="li lvl${Math.min(indent, 3)}">`
-        + `<span class="mk">${escapeHtml(marker)}</span>`
-        + `<span>${escapeHtml(m[2])}</span></div>`;
-    }).join("");
-  }).join("");
+    flushText();
+    flushList();
+  }
+  return out.join("");
 }
 
 // The schedule prints as a gantt chart. Until dates are filled in there is nothing to
@@ -182,48 +211,47 @@ export function proposalDocHtml(p, settings = {}) {
     [contact?.email || c.email, contact?.phone || c.phone].filter(Boolean).join(" | "),
   ].filter(Boolean);
 
-  const cover = blocks.filter((b) => (b.part || "workplan") === "cover");
+  const cover = blocks.map((b, i) => [b, i]).filter(([b]) => (b.part || "workplan") === "cover");
   const coverHtml = `
-    <section class="cover">
-      <div class="addressee">${addressee.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}</div>
-      <p class="re">RE: ${escapeHtml((p.title || "").toUpperCase())}</p>
-      ${cover.map((b) => prose(b.body, map)).join("")}
-      <p class="closing">Sincerely,</p>
-      <p class="signoff">Jim Dema-ala, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
-    </section>`;
+    <div class="addressee">${addressee.map((l) => `<div>${escapeHtml(l)}</div>`).join("")}</div>
+    <p class="re">RE: ${escapeHtml((p.title || "").toUpperCase())}</p>
+    ${cover.map(([b, i]) => prose(b.body, map, ` data-blk="${i}"`)).join("")}
+    <p class="closing">Sincerely,</p>
+    <p class="signoff">Jim Dema-ala, Principal Designer | ${escapeHtml(settings.business_name || "Tipolo Design Studio")}</p>
+    <div class="pagebreak"></div>`;
 
-  /* ---- everything after the cover ---- */
+  /* ---- everything after the cover ----
+     Emitted as a flat run of units (a heading, a paragraph, a list item, a table) rather
+     than nested sections, because paginate() lays out one unit at a time. data-blk lets
+     the builder mark the block your cursor is in; it is inert in print. */
 
-  // data-blk lets the builder mark the block your cursor is in. It is inert in print.
   const rest = blocks.map((b, i) => [b, i]).filter(([b]) => (b.part || "workplan") !== "cover")
     .map(([b, i]) => {
-    const tag = ` data-blk="${i}"`;
-    if (b.kind === "schedule") return `<div${tag}>${scheduleTable(b.rows, b.scale)}</div>`;
-    if (b.kind === "fees") return `<div${tag}>${feeTable(items)}</div>`;
-    if (b.kind === "optional-fees") return `<div${tag}>${optionalTable(b.rows)}</div>`;
-    if (b.kind === "signature") return `<div${tag}>${signatureBlock(settings)}</div>`;
+      const tag = ` data-blk="${i}"`;
+      if (b.kind === "schedule") return `<div class="unit"${tag}>${scheduleTable(b.rows, b.scale)}</div>`;
+      if (b.kind === "fees") return `<div class="unit"${tag}>${feeTable(items)}</div>`;
+      if (b.kind === "optional-fees") return `<div class="unit"${tag}>${optionalTable(b.rows)}</div>`;
+      if (b.kind === "signature") return `<div class="unit"${tag}>${signatureBlock(settings)}</div>`;
 
-    const lvl = b.level ?? (b.heading ? 2 : 0);
-    const heading = b.heading
-      ? (lvl === 1 ? `<h1>${escapeHtml(resolveTokens(b.heading, map))}</h1>`
-        : lvl === 2 ? `<h2>${escapeHtml(resolveTokens(b.heading, map))}</h2>`
-        : `<h3>${escapeHtml(resolveTokens(b.heading, map))}</h3>`)
-      : "";
-    return `<section class="blk lv${lvl}"${tag}>${heading}${prose(b.body, map)}</section>`;
-  }).join("");
+      const lvl = b.level ?? (b.heading ? 2 : 0);
+      const h = b.heading
+        ? `<h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}${tag}>${escapeHtml(resolveTokens(b.heading, map))}</h${lvl === 1 ? 1 : lvl === 2 ? 2 : 3}>`
+        : "";
+      return h + prose(b.body, map, tag);
+    }).join("");
 
-  // thead/tfoot rather than divs: browsers repeat them on every printed page, which is
-  // what the Word header and footer do.
-  return `
-    <div class="doc letterhead">
-      <table class="sheet">
-        <thead><tr><td class="lh-head-cell">${head}</td></tr></thead>
-        <tfoot><tr><td class="lh-foot-cell">${foot}</td></tr></tfoot>
-        <tbody><tr><td class="lh-body-cell"><div class="lh-body">
-          ${coverHtml}
-          <div class="pagebreak"></div>
-          ${rest}
-        </div></td></tr></tbody>
-      </table>
-    </div>`;
+  /* ---- lay it onto Letter pages ---- */
+
+  const pages = paginate(coverHtml + rest);
+  const sheets = pages.map((units, n) => `
+    <div class="sheet-page">
+      ${head}
+      <div class="lh-body">${units.join("")}</div>
+      <div class="lh-foot">
+        <span class="pageno">${n + 1}</span>
+        ${foot}
+      </div>
+    </div>`).join("");
+
+  return `<div class="doc letterhead">${sheets}</div>`;
 }

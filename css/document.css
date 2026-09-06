@@ -46,15 +46,36 @@
 .doc .doc-title { font-family: 'Fredoka', Arial, sans-serif; font-size: 20pt; font-weight: 500; margin-bottom: 2px; }
 .doc .doc-meta { font-size: 10pt; color: #555; }
 
-/* The sheet is a table so the band and bar repeat on every printed page, the way the
-   Word header and footer do. It is the only construct browsers repeat across pages. */
-.doc .sheet { width: 100%; border-collapse: collapse; }
-.doc .sheet > thead { display: table-header-group; }
-.doc .sheet > tfoot { display: table-footer-group; }
-.doc .sheet td { padding: 0; vertical-align: top; }
-/* Beats `.doc .sheet td` above — without the extra element selector the body copy
-   would run to the paper edge. */
-.doc .sheet td.lh-body-cell { padding: 26px var(--lh-margin) 18px; }
+/* Each page is a real 8.5x11 sheet built by js/print/paginate.js. The band and bar are
+   part of every sheet rather than a repeating table header, so the preview shows the
+   same pages the printer produces. */
+.doc.letterhead .sheet-page {
+  position: relative;
+  width: 8.5in;
+  height: 11in;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.doc.letterhead .lh-body {
+  flex: 1;
+  min-height: 0;
+  padding: 26px var(--lh-margin) 18px;
+}
+.doc.letterhead .lh-foot { position: relative; flex: none; }
+/* Page number, bottom right at the margin, sitting above the contact bar —
+   the PAGE field in the letterhead's footer. */
+.doc.letterhead .pageno {
+  position: absolute;
+  right: var(--lh-margin);
+  bottom: calc(0.47in + 5pt);
+  font-size: 8.5pt;
+  color: var(--lh-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* The probe paginate() measures in is never shown. */
+.pagination-probe .sheet-page { height: auto; }
 
 /* ---------- header band ---------- */
 .doc .lh-band {
@@ -138,12 +159,13 @@
   color: var(--lh-label);
   margin: 9pt 0 2pt;
 }
-.doc.letterhead .blk:first-child h1,
-.doc.letterhead .blk.lv1:first-of-type h1 { margin-top: 0; }
+/* Nothing carries its top margin into the top of a page. */
+.doc.letterhead .lh-body > :first-child { margin-top: 0; }
 
 /* bullets and numbered items; each level steps 18pt, as in the source document */
 .doc.letterhead .li { display: flex; gap: 6pt; margin-bottom: 1.5pt; }
-.doc.letterhead .li .mk { flex: none; min-width: 10pt; }
+.doc.letterhead .li .mk { flex: none; min-width: 11pt; }
+.doc.letterhead .li .tx { flex: 1; min-width: 0; }
 .doc.letterhead .li.lvl0 { padding-left: 18pt; }
 .doc.letterhead .li.lvl1 { padding-left: 36pt; }
 .doc.letterhead .li.lvl2 { padding-left: 54pt; }
@@ -152,12 +174,12 @@
 .doc.letterhead .li + p { margin-top: 7.5pt; }
 
 /* ---------- cover letter ---------- */
-.doc .cover .addressee { margin-bottom: 14pt; }
-.doc .cover .re { font-weight: 500; text-transform: uppercase; margin: 0 0 12pt; }
-.doc .cover .closing { margin: 14pt 0 0; }
-.doc .cover .signoff { margin: 18pt 0 0; }
-/* The cover letter is its own page; the proposal proper starts overleaf. */
-.doc .pagebreak { break-after: page; page-break-after: always; height: 0; }
+.doc .addressee { margin-bottom: 14pt; }
+.doc .re { font-weight: 500; text-transform: uppercase; margin: 0 0 12pt; }
+.doc .closing { margin: 14pt 0 0; }
+.doc .signoff { margin: 18pt 0 0; }
+/* Read by paginate(): the cover letter owns page 1, the proposal starts overleaf. */
+.doc .pagebreak { height: 0; }
 
 /* ---------- gantt chart ----------
    One grid: a task column then one column per week (or per working day). Header cells,
@@ -283,4 +305,10 @@
   .doc.letterhead h1, .doc.letterhead h2, .doc.letterhead h3 { break-after: avoid; }
   .doc table.fees tr, .doc table.sched tr, .doc table.lines tr { break-inside: avoid; }
   .doc .sig, .doc .totals, .doc .doc-foot { break-inside: avoid; }
+}
+
+/* Print: one sheet per page, and nothing may flow between them. */
+@media print {
+  .doc.letterhead .sheet-page { break-after: page; page-break-after: always; }
+  .doc.letterhead .sheet-page:last-child { break-after: auto; page-break-after: auto; }
 }

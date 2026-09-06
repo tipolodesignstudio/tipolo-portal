@@ -590,35 +590,18 @@ body.splitting { cursor: col-resize; user-select: none; }
    narrow pane) must overflow and scroll, never shrink — a squeezed sheet would rewrap
    the text and stop matching the print. */
 .paper-wrap { padding: 22px 18px 0; overflow-x: auto; }
+/* #paper holds the stack of sheets the paginator produced; each .sheet-page is one
+   real 8.5x11 page, so the preview is the document's actual pages. */
 .paper {
   margin: 0 auto;
   zoom: var(--zoom, 1);
-  position: relative;
   width: 8.5in;
-  min-height: 11in;
-  /* No padding: the letterhead's band and bar bleed to the paper edge, and the 0.75in
-     text margins are applied inside the document itself. */
   padding: 0;
-  background: #fff;
+}
+.paper .sheet-page {
   box-shadow: 0 1px 3px rgba(36, 42, 32, .16), 0 10px 34px rgba(36, 42, 32, .13);
 }
-/* Stretch the sheet so the letterhead's footer bar sits on the bottom paper edge.
-   The height is set from JS once the page count is known. */
-.paper > .doc, .paper .sheet { height: 100%; }
-
-/* Dashed rules where the printer will most likely break the page. Approximate: the
-   real break also avoids splitting rows and orphaning headings. */
-.page-guides { position: absolute; inset: 0; pointer-events: none; }
-.page-guides .guide {
-  position: absolute; left: 0; right: 0;
-  border-top: 1px dashed #B9B3A2;
-}
-.page-guides .guide span {
-  position: absolute; right: 4px; top: 3px;
-  font: 500 7pt/1 'Roboto', Arial, sans-serif;
-  color: #A9A392; letter-spacing: .04em; text-transform: uppercase;
-}
-
+.paper .sheet-page + .sheet-page { margin-top: 20px; }
 /* ---- editor cards ---- */
 .b-card {
   background: var(--card-bg);
@@ -859,3 +842,12 @@ table.mini .icon-btn:hover { background: var(--border-soft); color: var(--ink); 
 .sched-scale label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 .sched-scale input { width: auto; margin: 0; }
 table.mini input[type=date] { font-variant-numeric: tabular-nums; }
+
+/* list formatting controls under an active text block */
+.wb-format { display: none; gap: 3px; margin-top: 5px; }
+.wb.on .wb-format { display: flex; }
+.wb-format button {
+  border: 1px solid var(--border-soft); background: var(--card-bg); color: var(--ink-soft);
+  border-radius: 5px; padding: 2px 8px; font-size: .72rem; cursor: pointer; line-height: 1.5;
+}
+.wb-format button:hover { background: var(--bg-alt); color: var(--ink); border-color: var(--border); }
