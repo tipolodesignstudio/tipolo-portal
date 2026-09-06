@@ -23,12 +23,13 @@ const TONE = { draft: "grey", sent: "amber", accepted: "green", declined: "red" 
 const LABEL = { draft: "Draft", sent: "Sent", accepted: "Accepted", declined: "Declined" };
 const SCOPES = ["landscape", "multimedia", "other"];
 
-// Letter at 96dpi, with the margins @page uses in print.css.
-const PX_MM = 96 / 25.4;
+// Letter at 96dpi. The letterhead's band and bar repeat on every printed page, so the
+// room left for body copy is what remains between them.
 const PAGE_H = 11 * 96;
 const PAGE_W = 8.5 * 96;
-const MARGIN_Y = 18 * PX_MM;
-const CONTENT_H = PAGE_H - MARGIN_Y * 2;
+const BAND_H = 1.75 * 96;   // cream header band
+const BAR_H = 0.47 * 96;    // dark footer bar
+const CONTENT_H = PAGE_H - BAND_H - BAR_H;
 
 const ZOOM_KEY = "tipolo.builder.zoom";
 const SPLIT_KEY = "tipolo.builder.split";
@@ -263,22 +264,28 @@ export async function render(root, ctx) {
   }
 
   function paintGuides() {
-    const docEl = paper.querySelector(".doc");
+    // Measure the content, not its cell: the cell is stretched to the sheet height so
+    // the footer bar lands on the bottom edge, which would feed back into the count.
+    const bodyEl = paper.querySelector(".lh-body");
     const layer = paper.querySelector(".page-guides");
-    if (!docEl || !layer) return;
+    if (!bodyEl || !layer) return;
+    // On the narrow layout the preview pane is display:none behind the Edit tab, where
+    // everything measures 0. Leave the last good count; the tab handler repaints.
+    if (!previewPane.clientWidth) return;
     // getBoundingClientRect is in device pixels, so undo the zoom to get paper pixels.
-    const h = docEl.getBoundingClientRect().height / (zoom || 1);
+    const h = bodyEl.getBoundingClientRect().height / (zoom || 1);
     const pages = Math.max(1, Math.ceil(h / CONTENT_H));
 
     layer.innerHTML = "";
     for (let n = 1; n < pages; n++) {
       const g = document.createElement("div");
       g.className = "guide";
-      g.style.top = `${MARGIN_Y + n * CONTENT_H}px`;
+      g.style.top = `${BAND_H + n * CONTENT_H}px`;
       g.innerHTML = `<span>Page ${n + 1}</span>`;
       layer.append(g);
     }
-    paper.style.minHeight = `${pages * PAGE_H}px`;
+    // A fixed height (not min-height) so the sheet's footer bar sits on the bottom edge.
+    paper.style.height = `${BAND_H + pages * CONTENT_H + BAR_H}px`;
     pagesLabel.textContent = `${pages} page${pages === 1 ? "" : "s"}`;
   }
 

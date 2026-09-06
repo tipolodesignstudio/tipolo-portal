@@ -85,6 +85,23 @@ builds the document markup, and both the preview pane and **Save as PDF** render
 same markup under `css/document.css`. The only difference between the two is a highlight
 on whichever section your cursor is in.
 
+The page is set on the Tipolo letterhead (`04_Templates/Letterhead Design/Tipolo
+Letterhead.docx`) — cream band, wordmark, dark contact bar, measured off the Word file.
+Its three placeholders are wired to real data:
+
+| Letterhead | Filled with |
+|---|---|
+| `YYNNN` | the proposal number, or `DRAFT` before one is drawn |
+| `[Project Name]` | the proposal title |
+| `Month DD, YYYY` | the sent date, or the date the proposal was created |
+
+Because the letterhead is a Word header/footer, its band and bar repeat on every page.
+In print that is a `<thead>`/`<tfoot>` — the one construct browsers repeat across pages.
+The preview draws them once on a continuous sheet, so a multi-page proposal shows the
+band a page short of what prints. `@page` margin is zero so the bands can bleed; the
+0.75in text margins are applied inside the document. Invoices are not on the letterhead
+and carry their own margins (`.doc:not(.letterhead)`).
+
 - **Page guides** — dashed rules mark where Letter pages break, so you can see a heading
   about to be orphaned. They're approximate: the real print also avoids splitting table
   rows and stranding headings.

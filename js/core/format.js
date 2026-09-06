@@ -27,6 +27,15 @@ export function date(value) {
   return _dateFmt.format(d);
 }
 
+// "September 5, 2026" — the letterhead's Month DD, YYYY.
+const _longDateFmt = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "long", day: "numeric" });
+export function longDate(value) {
+  if (!value) return "";
+  const d = value instanceof Date ? value : new Date(value + (String(value).length === 10 ? "T00:00:00" : ""));
+  if (isNaN(d)) return "";
+  return _longDateFmt.format(d);
+}
+
 export function isoDate(value = new Date()) {
   const d = value instanceof Date ? value : new Date(value);
   return d.toISOString().slice(0, 10);

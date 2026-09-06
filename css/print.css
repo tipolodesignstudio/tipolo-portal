@@ -1,8 +1,11 @@
 /* Print-only rules. Loaded with media="print".
    The document's own styling lives in document.css, which loads for every medium so
-   the builder's preview pane and the printed page are laid out by the same rules. */
+   the builder's preview pane and the printed page are laid out by the same rules.
 
-@page { size: Letter; margin: 18mm 16mm; }
+   Zero page margin because the letterhead's band and bar bleed to the paper edge; the
+   0.75in text margins are applied inside the document instead. */
+
+@page { size: Letter; margin: 0; }
 
 @media print {
   body * { visibility: hidden; }
@@ -11,6 +14,11 @@
     position: absolute;
     inset: 0;
     background: #fff;
+  }
+  /* Ask for the band and bar to be painted rather than dropped as "background". */
+  #print-root .lh-band, #print-root .lh-bar {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .no-print { display: none !important; }
 }
