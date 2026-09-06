@@ -44,7 +44,10 @@ GitHub Pages redeploys automatically in ~1 minute.
 ```
 config.js                  Supabase URL + anon key (safe to commit)
 index.html                 app shell
-css/app.css                app styles     css/print.css   invoice/proposal print layout
+css/app.css                app styles
+css/document.css           the printed page — loaded for screen too, so the builder's
+                           preview and the printout share one set of rules
+css/print.css              print-only: @page size/margins, hide everything but #print-root
 vendor/supabase-js.esm.js  vendored Supabase client (+ node-buffer-shim.mjs)
 vendor/pdf.min.mjs         vendored pdf.js (+ pdf.worker.min.mjs) — proposal PDF import
 js/app.js                  bootstrap: config check → auth gate → shell + router
@@ -67,8 +70,29 @@ dev/                       local parser check (not used by the app)
 | 4 | Proposals + templates + conversion | ✅ built |
 | 5 | Expenses (project & business, re-billable) | ✅ built |
 | — | Proposal PDF import (read a PDF into a draft, or save it as a template) | ✅ built |
+| — | Proposal builder: split editor + live print preview | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
+
+## The proposal builder
+
+Opening a proposal gives you a two-pane workspace: the form on the left, the page the
+client will receive on the right, redrawing as you type. `{{tokens}}` show resolved in
+the preview while you keep editing the raw text.
+
+The preview isn't a mock-up of the output — it *is* the output. `js/print/proposal-doc.js`
+builds the document markup, and both the preview pane and **Save as PDF** render that
+same markup under `css/document.css`. The only difference between the two is a highlight
+on whichever section your cursor is in.
+
+- **Page guides** — dashed rules mark where Letter pages break, so you can see a heading
+  about to be orphaned. They're approximate: the real print also avoids splitting table
+  rows and stranding headings.
+- **Fit / 50 / 75 / 100%** zoom, and a draggable divider. Both are remembered.
+- **Cmd/Ctrl+S** saves; an *Unsaved* badge shows when there's something to save, and
+  closing the tab mid-edit warns you.
+- Non-draft proposals show the same split, read-only.
+- Under 1000px wide the panes become **Edit** / **Preview** tabs.
 
 ## Importing a proposal from a PDF
 

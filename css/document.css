@@ -1,0 +1,51 @@
+/* ===== The printed document (proposals + invoices) =====
+   Loaded for ALL media, unlike print.css. These are the rules that lay out the page
+   that comes out of the printer — and because the builder's preview pane renders the
+   same markup into a paper-sized box, they lay out the preview too. One set of rules,
+   so what Jim sees while editing is what the client receives.
+
+   Sizes are in pt on purpose: at 96dpi a browser maps pt to px at a fixed ratio, so an
+   8.5in-wide box on screen shows type at exactly its printed size. */
+
+.doc {
+  background: #fff;
+  color: #1a1a1a;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+
+.doc .doc-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
+.doc .doc-head .biz { font-family: 'Fredoka', Arial, sans-serif; }
+.doc .doc-head .biz .name { font-size: 15pt; font-weight: 600; color: #3F4A20; letter-spacing: .04em; }
+.doc .doc-title { font-family: 'Fredoka', Arial, sans-serif; font-size: 20pt; font-weight: 500; margin-bottom: 2px; }
+.doc .doc-meta { font-size: 10pt; color: #555; }
+
+.doc .parties { display: flex; gap: 40px; margin: 20px 0 26px; font-size: 10.5pt; }
+.doc .parties h4 { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #888; margin-bottom: 4px; }
+
+.doc table.lines { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 10.5pt; }
+.doc table.lines th { text-align: left; border-bottom: 1.5px solid #3F4A20; padding: 7px 8px; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: #555; }
+.doc table.lines td { padding: 7px 8px; border-bottom: 1px solid #e2e2e2; vertical-align: top; }
+.doc table.lines td.num, .doc table.lines th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.doc .totals { margin-left: auto; width: 52%; font-size: 10.5pt; }
+.doc .totals .row { display: flex; justify-content: space-between; padding: 4px 8px; }
+.doc .totals .row.grand { border-top: 1.5px solid #3F4A20; font-weight: 600; font-size: 12pt; margin-top: 4px; padding-top: 8px; }
+
+.doc .section { margin: 16px 0; }
+.doc .section h3 { font-family: 'Fredoka', Arial, sans-serif; font-size: 12pt; margin-bottom: 4px; }
+.doc .doc-foot { margin-top: 34px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9.5pt; color: #666; white-space: pre-wrap; }
+
+/* Keep a heading with the text under it, and never split a fee row across pages. */
+@media print {
+  .doc .section { break-inside: auto; }
+  .doc .section h3 { break-after: avoid; }
+  .doc table.lines tr { break-inside: avoid; }
+  .doc .totals { break-inside: avoid; }
+  .doc .doc-foot { break-inside: avoid; }
+}
+
+/* An empty section body still needs to occupy its line in the preview, or the paper
+   jumps around as you type the first character. */
+.doc .section .body:empty::after { content: "\200b"; }
