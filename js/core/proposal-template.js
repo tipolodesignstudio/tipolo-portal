@@ -12,7 +12,8 @@
 //           2 = "Task 1: …"        10.6pt
 //           3 = "Deliverables"      9.1pt bold
 //           0 = body copy, no heading
-//   kind    schedule | fees | optional-fees | signature — rendered as a table, not prose
+//   kind    schedule | fees | optional-fees | signature — rendered as a table or chart
+//           the schedule block also carries scale: "week" | "day" for the gantt
 //
 // In body text a line starting "• " is a bullet and each two leading spaces before it
 // is one more level of indent, matching the source document's 18pt steps.
@@ -87,12 +88,15 @@ const WORKPLAN = [
 
 const SCHEDULE = [
   { part: "schedule", level: 1, heading: "Project Schedule" },
-  { part: "schedule", kind: "schedule", rows: [
-    { task: "Project Start", start: "[Date]", due: "" },
-    { task: "Task 1: [Task Name]", start: "[Date]", due: "[Date]" },
-    { task: "Task 2: [Task Name]", start: "[Date]", due: "[Date]" },
-    { task: "Task 3: [Task Name]", start: "[Date]", due: "[Date]" },
-    { task: "Task 4: [Task Name]", start: "[Date]", due: "[Date]" },
+  // Dates start empty: a date input only takes YYYY-MM-DD, and until some are set the
+  // schedule prints as a plain table rather than an empty chart. "Project Start" has no
+  // due date on purpose — a row without one plots as a milestone diamond.
+  { part: "schedule", kind: "schedule", scale: "week", rows: [
+    { task: "Project Start", start: "", due: "" },
+    { task: "Task 1: [Task Name]", start: "", due: "" },
+    { task: "Task 2: [Task Name]", start: "", due: "" },
+    { task: "Task 3: [Task Name]", start: "", due: "" },
+    { task: "Task 4: [Task Name]", start: "", due: "" },
   ] },
 ];
 

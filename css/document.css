@@ -159,7 +159,84 @@
 /* The cover letter is its own page; the proposal proper starts overleaf. */
 .doc .pagebreak { break-after: page; page-break-after: always; height: 0; }
 
-/* ---------- schedule ---------- */
+/* ---------- gantt chart ----------
+   One grid: a task column then one column per week (or per working day). Header cells,
+   the background cells that draw the rules, and the bars are all grid items placed by
+   row and column, so bars can span columns and sit over the ruling. */
+.doc .gantt {
+  display: grid;
+  margin: 8pt 0 6pt 18pt;
+  width: calc(100% - 18pt);
+  font-size: 7pt;
+  align-items: stretch;
+}
+.doc .gantt .g-corner {
+  grid-row: 1; grid-column: 1;
+  display: flex; align-items: flex-end;
+  padding: 0 6pt 3pt 0;
+  font-size: 7.4pt; font-weight: 500; color: var(--lh-muted);
+  border-bottom: 1.2px solid var(--lh-bark);
+}
+.doc .gantt .g-wk, .doc .gantt .g-dy {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding: 1pt 1pt 3pt;
+  border-bottom: 1.2px solid var(--lh-bark);
+  border-left: 1px solid #E6E2D6;
+  line-height: 1.15; text-align: center;
+}
+.doc .gantt .g-wk b { font-weight: 500; font-size: 6.8pt; color: var(--lh-label); }
+.doc .gantt .g-wk span { font-size: 6pt; color: var(--lh-muted); white-space: nowrap; }
+.doc .gantt .g-dy { border-bottom-width: 1px; }
+.doc .gantt .g-dy b { font-weight: 400; font-size: 6pt; color: var(--lh-muted); }
+.doc .gantt .g-dy span { font-size: 6.2pt; color: var(--lh-label); }
+/* in day scale the week band keeps its rule, the day band sits under it */
+.doc .gantt.sc-day .g-wk { border-bottom: 1px solid #E6E2D6; }
+
+.doc .gantt .g-task {
+  display: flex; align-items: center;
+  padding: 3pt 6pt 3pt 0;
+  font-size: 7.4pt; line-height: 1.2;
+  border-bottom: 1px solid #E6E2D6;
+}
+.doc .gantt .g-cell {
+  border-left: 1px solid #EFEBDF;
+  border-bottom: 1px solid #E6E2D6;
+  min-height: 15pt;
+}
+.doc .gantt .g-cell.wk-end { border-right: 1px solid #E0DBCB; }
+
+.doc .gantt .g-bar {
+  align-self: center;
+  margin: 0 1px;
+  height: 9.5pt;
+  background: var(--lh-bark);
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 3pt;
+  color: var(--lh-cream);
+  font-size: 5.8pt; line-height: 1;
+  white-space: nowrap; overflow: hidden;
+  z-index: 1;
+}
+.doc .gantt .g-bar.clipped { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.doc .gantt .g-bar .d { margin-left: 6pt; }
+
+.doc .gantt .g-mile {
+  align-self: center;
+  display: flex; align-items: center; gap: 3pt;
+  padding-left: 2px;
+  z-index: 1;
+}
+.doc .gantt .g-mile i {
+  width: 7pt; height: 7pt; flex: none;
+  background: var(--lh-bark);
+  transform: rotate(45deg);
+}
+.doc .gantt .g-mile span { font-size: 6pt; color: var(--lh-label); white-space: nowrap; }
+
+.doc .g-note { font-size: 7pt; color: var(--lh-muted); margin: 2pt 0 0 18pt; }
+
+/* ---------- schedule (fallback table, before any dates are set) ---------- */
 .doc table.sched { width: 100%; border-collapse: collapse; margin: 6pt 0 4pt; font-size: 8.5pt; }
 .doc table.sched th {
   text-align: left; padding: 4pt 6pt; border-bottom: 1.2px solid var(--lh-bark);

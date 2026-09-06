@@ -849,3 +849,13 @@ table.mini .icon-btn:hover { background: var(--border-soft); color: var(--ink); 
   box-shadow: -10px 0 0 -7px var(--accent);
   transition: box-shadow .18s;
 }
+
+/* schedule scale toggle in the builder */
+.sched-scale {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 9px; font-size: .8rem; color: var(--ink-soft);
+}
+.sched-scale > span { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
+.sched-scale label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.sched-scale input { width: auto; margin: 0; }
+table.mini input[type=date] { font-variant-numeric: tabular-nums; }

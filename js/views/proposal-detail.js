@@ -211,15 +211,34 @@ export async function render(root, ctx) {
   }
 
   function scheduleEditor(b, i) {
-    return `<table class="mini"><thead><tr><th>Task</th><th>Start</th><th>Due</th><th></th></tr></thead>
+    const scale = b.scale || "week";
+    const dated = (b.rows || []).some((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.start || r.due || ""));
+    return `<div class="sched-scale">
+        <span>Chart by</span>
+        <label><input type="radio" name="sc${i}" data-scale="week" ${scale === "week" ? "checked" : ""}
+          ${editable ? "" : "disabled"} /> Weeks</label>
+        <label><input type="radio" name="sc${i}" data-scale="day" ${scale === "day" ? "checked" : ""}
+          ${editable ? "" : "disabled"} /> Working days</label>
+      </div>
+      <table class="mini"><thead><tr>
+        <th>Task</th><th style="width:132px">Start</th><th style="width:132px">Due</th><th></th>
+      </tr></thead>
       <tbody>${(b.rows || []).map((r, j) => `<tr data-j="${j}">
         <td><input data-rk="task" value="${escapeHtml(r.task || "")}" ${editable ? "" : "readonly"} /></td>
-        <td><input data-rk="start" value="${escapeHtml(r.start || "")}" ${editable ? "" : "readonly"} /></td>
-        <td><input data-rk="due" value="${escapeHtml(r.due || "")}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="start" type="date" value="${escapeHtml(isoOnly(r.start))}" ${editable ? "" : "readonly"} /></td>
+        <td><input data-rk="due" type="date" value="${escapeHtml(isoOnly(r.due))}" ${editable ? "" : "readonly"} /></td>
         <td>${editable ? `<button class="icon-btn" data-del-row>✕</button>` : ""}</td></tr>`).join("")}
       </tbody></table>
-      ${editable ? `<button class="btn link sm" data-add-row>+ Add row</button>` : ""}`;
+      ${editable ? `<button class="btn link sm" data-add-row>+ Add row</button>` : ""}
+      <p class="hint" style="margin-top:6px">
+        ${dated
+          ? "Leave <strong>Due</strong> empty for a milestone — it plots as a diamond, like Project Start."
+          : "Set dates to draw the chart. Until then the schedule prints as a plain table."}
+        Weeks run Monday–Friday.</p>`;
   }
+
+  // A date input only accepts YYYY-MM-DD; older rows may hold "[Date]" or similar.
+  function isoOnly(v) { return /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? v : ""; }
 
   function optionalEditor(b, i) {
     return `<table class="mini"><thead><tr><th style="width:44px">Ref</th><th>Description</th><th style="width:110px">Fee</th><th></th></tr></thead>
@@ -461,10 +480,19 @@ export async function render(root, ctx) {
   });
 
   /* ---- table rows inside blocks ---- */
-  on(root, "input", ".wb [data-rk]", (e, el) => {
+  // `change` as well as `input`: a date picked from the calendar popup fires change.
+  const rowEdit = (e, el) => {
     const i = +el.closest(".wb").dataset.i;
     const j = +el.closest("tr").dataset.j;
     blocks[i].rows[j][el.dataset.rk] = el.value;
+    touched();
+  };
+  on(root, "input", ".wb [data-rk]", rowEdit);
+  on(root, "change", ".wb input[type=date][data-rk]", rowEdit);
+  on(root, "change", ".wb [data-scale]", (e, el) => {
+    const i = +el.closest(".wb").dataset.i;
+    blocks[i].scale = el.dataset.scale;
+    renderEditor();
     touched();
   });
   on(root, "click", ".wb [data-add-row]", (e, el) => {

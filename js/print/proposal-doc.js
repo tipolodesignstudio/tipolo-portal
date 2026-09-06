@@ -22,6 +22,7 @@ import { lineAmount } from "../core/invoice-calc.js";
 import { buildTokenMap, resolveTokens } from "../core/tokens.js";
 import { clientPrimaryContact } from "../core/api.js";
 import { normaliseSections } from "../core/proposal-template.js";
+import { buildGantt } from "../core/gantt.js";
 
 // Set verbatim from the letterhead. Settings has no field that matches these two
 // lines (its `email` is the accounts address, not the one printed here), so they live
@@ -52,8 +53,47 @@ function prose(text, map) {
   }).join("");
 }
 
-function scheduleTable(rows = []) {
+// The schedule prints as a gantt chart. Until dates are filled in there is nothing to
+// plot, so it falls back to the plain task/start/due table rather than an empty grid.
+function scheduleTable(rows = [], scale = "week") {
   if (!rows.length) return "";
+  const g = buildGantt(rows, scale);
+  if (!g) return plainSchedule(rows);
+
+  const head = g.scale === "day"
+    ? `${g.weeks.map((w) => `<div class="g-wk" style="grid-row:1;grid-column:${2 + w.startCol}/span ${w.span}">
+          <b>${escapeHtml(w.label)}</b><span>${escapeHtml(w.sub)}</span></div>`).join("")}
+       ${g.cols.map((c) => `<div class="g-dy" style="grid-row:2;grid-column:${2 + c.i}">
+          <b>${escapeHtml(c.label)}</b><span>${escapeHtml(c.sub)}</span></div>`).join("")}`
+    : g.weeks.map((w) => `<div class="g-wk" style="grid-row:1;grid-column:${2 + w.startCol}/span ${w.span}">
+          <b>${escapeHtml(w.label)}</b><span>${escapeHtml(w.sub)}</span></div>`).join("");
+
+  const headRows = g.scale === "day" ? 2 : 1;
+  const body = g.bars.map((b, i) => {
+    const row = headRows + 1 + i;
+    const cells = Array.from({ length: g.colCount }, (_, c) =>
+      `<div class="g-cell${(c + 1) % (g.scale === "day" ? 5 : 1) === 0 ? " wk-end" : ""}"
+            style="grid-row:${row};grid-column:${2 + c}"></div>`).join("");
+    const label = `<div class="g-task" style="grid-row:${row};grid-column:1">${escapeHtml(b.task)}</div>`;
+    if (b.empty) return label + cells;
+    const bar = b.milestone
+      ? `<div class="g-mile" style="grid-row:${row};grid-column:${2 + b.startCol}">
+           <i></i><span>${escapeHtml(b.startLabel)}</span></div>`
+      : `<div class="g-bar${b.clipped ? " clipped" : ""}"
+              style="grid-row:${row};grid-column:${2 + b.startCol}/${3 + b.endCol}">
+           <span class="s">${escapeHtml(b.startLabel)}</span>
+           <span class="d">${escapeHtml(b.dueLabel)}</span></div>`;
+    return label + cells + bar;
+  }).join("");
+
+  return `<div class="gantt sc-${g.scale}" style="grid-template-columns:1.55in repeat(${g.colCount},1fr)">
+      <div class="g-corner" style="grid-row:1/span ${headRows};grid-column:1">Task</div>
+      ${head}${body}
+    </div>
+    ${g.truncated ? `<p class="g-note">Chart truncated — the schedule runs past the columns shown.</p>` : ""}`;
+}
+
+function plainSchedule(rows) {
   return `<table class="sched"><thead><tr>
       <th>Task</th><th class="dt">Start</th><th class="dt">Due</th>
     </tr></thead><tbody>
@@ -158,7 +198,7 @@ export function proposalDocHtml(p, settings = {}) {
   const rest = blocks.map((b, i) => [b, i]).filter(([b]) => (b.part || "workplan") !== "cover")
     .map(([b, i]) => {
     const tag = ` data-blk="${i}"`;
-    if (b.kind === "schedule") return `<div${tag}>${scheduleTable(b.rows)}</div>`;
+    if (b.kind === "schedule") return `<div${tag}>${scheduleTable(b.rows, b.scale)}</div>`;
     if (b.kind === "fees") return `<div${tag}>${feeTable(items)}</div>`;
     if (b.kind === "optional-fees") return `<div${tag}>${optionalTable(b.rows)}</div>`;
     if (b.kind === "signature") return `<div${tag}>${signatureBlock(settings)}</div>`;
