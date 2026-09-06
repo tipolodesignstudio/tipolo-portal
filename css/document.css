@@ -190,15 +190,21 @@
   margin: 0 0 12pt;
 }
 .doc .closing { margin: 14pt 0 0; }
-/* Three lines of room after "Sincerely," for the signature; the image sits in it when
-   one has been uploaded in Settings, and the space stays either way. */
+/* Three lines of room after "Sincerely," for the signature. It is a minimum, not a cap:
+   the space is held even with no image, and a squarer signature (initials rather than a
+   wide strip) is allowed to grow to a legible height instead of being squashed into it. */
 .doc .sig-slot {
-  height: 3.2em;
+  min-height: 3.2em;
   margin-top: 2pt;
   display: flex;
   align-items: center;
 }
-.doc .sig-slot img { max-height: 100%; max-width: 2.6in; object-fit: contain; object-position: left; }
+.doc .sig-slot img {
+  max-height: 0.8in;
+  max-width: 2.6in;
+  object-fit: contain;
+  object-position: left center;
+}
 .doc .signoff { margin: 4pt 0 0; }
 .doc .signoff b { font-weight: 700; }
 /* Read by paginate(): the cover letter owns page 1, the proposal starts overleaf. */
