@@ -102,10 +102,13 @@ export async function render(root, ctx) {
         </div>
         <div class="form-grid cols-2">
           ${number("default_hourly_rate", "Default hourly rate", s.default_hourly_rate, "0.01")}
+          ${number("default_day_rate", "Day rate", s.default_day_rate, "0.01")}
           ${number("job_seq_year", "Sequence year", s.job_seq_year ?? new Date().getFullYear(), "1")}
           ${number("job_seq_next", "Next job number", s.job_seq_next ?? 1, "1")}
         </div>
-        <div class="hint">Adjust "Next job number" only to line the portal up with numbers you've already issued elsewhere.</div>
+        <div class="hint">Leave the day rate blank and a proposal works it out as the hourly
+          rate &times; 8. Adjust "Next job number" only to line the portal up with numbers
+          you've already issued elsewhere.</div>
       </div>
 
       <div class="card">
@@ -221,6 +224,8 @@ export async function render(root, ctx) {
       logo_url: fd.get("logo_url") || null,
       signature_url: fd.get("signature_url") || null,
       default_hourly_rate: fd.get("default_hourly_rate") ? Number(fd.get("default_hourly_rate")) : null,
+      // Left blank the proposal works it out as the hourly rate x 8.
+      default_day_rate: fd.get("default_day_rate") ? Number(fd.get("default_day_rate")) : null,
       job_seq_year: Math.max(2000, Number(fd.get("job_seq_year")) || new Date().getFullYear()),
       job_seq_next: Math.max(1, Number(fd.get("job_seq_next")) || 1),
       payment_terms: fd.get("payment_terms") || null,

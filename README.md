@@ -111,6 +111,11 @@ margins (`.doc:not(.letterhead)`).
   columns, or 10 working-day columns) moves to a landscape page of its own, heading and
   all. Only when it has to; a six-week chart stays in place.
 - **Fit / 50 / 75 / 100%** zoom, and a draggable divider. Both are remembered.
+- **Text tools** — Bold, Italic, Underline (⌘B / ⌘I / ⌘U, and they toggle), bullets,
+  numbering and indent. The stored text stays plain: `**bold**`, `*italic*`,
+  `__underline__` are rendered on the page, so nothing can inject markup.
+- **Tab indents inside a text box** rather than jumping to the next control. Press
+  Escape first to leave the field, so the form is still reachable from the keyboard.
 - **Cmd/Ctrl+S** saves; an *Unsaved* badge shows when there's something to save, and
   closing the tab mid-edit warns you.
 - Non-draft proposals show the same split, read-only.

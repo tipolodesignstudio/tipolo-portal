@@ -874,3 +874,7 @@ table.mini input[type=date] { font-variant-numeric: tabular-nums; }
   font-size: .68rem; color: var(--ink-faint); cursor: pointer; padding: 0 2px;
 }
 .wb-tools .brk input { width: auto; margin: 0; }
+.wb-format .sep {
+  width: 1px; align-self: stretch; background: var(--border-soft); margin: 2px 3px;
+}
+.wb-format button[data-wrap] { min-width: 24px; text-align: center; }

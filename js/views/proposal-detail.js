@@ -192,9 +192,14 @@ export async function render(root, ctx) {
       <textarea class="wt" data-k="body" placeholder="Write here…"
         ${editable ? "" : "readonly"}>${escapeHtml(b.body || "")}</textarea>
       ${editable ? `<div class="wb-format">
+        <button data-wrap="**" title="Bold (⌘B)" style="font-weight:700">B</button>
+        <button data-wrap="*" title="Italic (⌘I)" style="font-style:italic">I</button>
+        <button data-wrap="__" title="Underline (⌘U)" style="text-decoration:underline">U</button>
+        <span class="sep"></span>
         <button data-fmt="bullet" title="Bullet list">• List</button>
         <button data-fmt="number" title="Numbered list">1. List</button>
-        <button data-fmt="outdent" title="Outdent (Shift+Tab)">⇤</button>
+        <span class="sep"></span>
+        <button data-fmt="outdent" title="Outdent (⇧Tab)">⇤</button>
         <button data-fmt="indent" title="Indent (Tab)">⇥</button>
       </div>` : ""}
     </div>`;
@@ -609,22 +614,68 @@ export async function render(root, ctx) {
     ta.focus();
   }
 
+  // Wraps the selection in the marker, or unwraps it if it is already wrapped, so the
+  // button toggles the way a word processor's does. With nothing selected it drops the
+  // pair in and puts the caret between them, ready to type.
+  function wrapSelection(ta, mark) {
+    const { selectionStart: a, selectionEnd: b, value: v } = ta;
+    const sel = v.slice(a, b);
+    const n = mark.length;
+
+    // Already wrapped, either just outside the selection or at its own edges — both
+    // happen depending on what was selected when the button was pressed.
+    const outside = v.slice(a - n, a) === mark && v.slice(b, b + n) === mark;
+    const inside = sel.length >= n * 2 && sel.startsWith(mark) && sel.endsWith(mark);
+
+    if (outside) {
+      ta.setRangeText(sel, a - n, b + n, "select");
+    } else if (inside) {
+      ta.setRangeText(sel.slice(n, -n), a, b, "select");
+    } else {
+      ta.setRangeText(mark + sel + mark, a, b, "end");
+      // leave the words selected, not the markers, so pressing again turns it off
+      if (sel) ta.setSelectionRange(a + n, a + n + sel.length);
+      else ta.setSelectionRange(a + n, a + n);
+    }
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    ta.focus();
+  }
+
   on(root, "click", ".wb-format button", (e, btn) => {
     e.preventDefault();
     const ta = btn.closest(".wb").querySelector("textarea");
-    if (ta) formatLines(ta, btn.dataset.fmt);
+    if (!ta) return;
+    if (btn.dataset.wrap) wrapSelection(ta, btn.dataset.wrap);
+    else formatLines(ta, btn.dataset.fmt);
   });
 
-  // Tab indents a list item, the way it does in a word processor. Only on list lines,
-  // so Tab still moves between fields everywhere else.
+  // Inside a body box, Tab indents the text rather than jumping to the next control —
+  // what a word processor does, and what the browser does not. Escape first, then Tab,
+  // to leave the field, so the form is still reachable from the keyboard alone.
   on(root, "keydown", ".wb textarea", (e, ta) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && !e.altKey) {
+      const mark = { b: "**", i: "*", u: "__" }[e.key.toLowerCase()];
+      if (mark) { e.preventDefault(); wrapSelection(ta, mark); return; }
+    }
+    if (e.key === "Escape") { ta.blur(); return; }
     if (e.key !== "Tab") return;
-    const from = ta.value.lastIndexOf("\n", Math.max(0, ta.selectionStart - 1)) + 1;
-    const line = ta.value.slice(from, ta.value.indexOf("\n", from) === -1
-      ? ta.value.length : ta.value.indexOf("\n", from));
-    if (!MARKER.test(line)) return;
+
     e.preventDefault();
-    formatLines(ta, e.shiftKey ? "outdent" : "indent");
+    const from = ta.value.lastIndexOf("\n", Math.max(0, ta.selectionStart - 1)) + 1;
+    const eol = ta.value.indexOf("\n", from);
+    const line = ta.value.slice(from, eol === -1 ? ta.value.length : eol);
+
+    // On a list line, or with lines selected, Tab changes the indent. Otherwise it
+    // inserts a tab where the caret is.
+    if (MARKER.test(line) || ta.selectionStart !== ta.selectionEnd) {
+      formatLines(ta, e.shiftKey ? "outdent" : "indent");
+    } else if (e.shiftKey) {
+      formatLines(ta, "outdent");
+    } else {
+      ta.setRangeText("\t", ta.selectionStart, ta.selectionEnd, "end");
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    }
   });
 
   /* ---- base-scope fee lines ---- */

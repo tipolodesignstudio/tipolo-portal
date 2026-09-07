@@ -140,7 +140,7 @@
 }
 
 /* ---------- proposal body ---------- */
-.doc.letterhead p { margin: 0 0 7.5pt; }
+.doc.letterhead p { margin: 0 0 7.5pt; tab-size: 4; }
 .doc.letterhead p:last-child { margin-bottom: 0; }
 
 .doc.letterhead h1 {

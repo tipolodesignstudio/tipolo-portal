@@ -38,7 +38,7 @@ export const LEVELS = [
 
 const COVER = [
   { part: "cover", level: 0, body:
-`Dear [First Name],
+`Dear {{client.firstName}},
 
 Tipolo Design Studio is pleased to submit a [landscape/multimedia] design services proposal for [Client Name]'s [project in a few words]. [One sentence on the particular constraint or opportunity you discussed — what will make or break the job.]
 
@@ -145,7 +145,7 @@ const FEES = () => [
   // proposal. Settings has no day-rate field (Jim's is not simply hours x 8), so that
   // one stays a bracket.
   { part: "fees", level: 2, heading: "Hourly Rate ({{date.year}})", body:
-`• Principal Designer: {{rate.hourly}}/hour ($[000] per day)` },
+`• Principal Designer: {{rate.hourly}}/hour ({{rate.daily}} per day)` },
 
   { part: "fees", level: 2, heading: "Payment Schedule" },
   // Percentages are edited; the amounts are worked out from the A. Base Scope total.

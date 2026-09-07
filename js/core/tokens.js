@@ -10,6 +10,8 @@ export function buildTokenMap({ client = {}, proposal = {}, settings = {} }) {
   return {
     "client.name": client.name || "",
     "client.contact": client.is_individual ? client.name : (primary?.name || ""),
+    "client.firstName": ((client.is_individual ? client.name : primary?.name) || "")
+      .trim().split(/\s+/)[0] || "[First Name]",
     "client.email": primary?.email || client.email || "",
     "project.title": proposal.title || "",
     "project.scope": proposal.project_scope || "",
@@ -23,6 +25,11 @@ export function buildTokenMap({ client = {}, proposal = {}, settings = {} }) {
     // rather than leaving a silent gap in the fee section.
     "rate.hourly": settings.default_hourly_rate
       ? money(settings.default_hourly_rate) : "[set the hourly rate in Settings]",
+    // A day is eight hours unless Settings overrides it.
+    "rate.daily": settings.default_day_rate
+      ? money(settings.default_day_rate)
+      : settings.default_hourly_rate
+        ? money(settings.default_hourly_rate * 8) : "[set the hourly rate in Settings]",
     "date.year": String(new Date().getFullYear()),
   };
 }
@@ -45,7 +52,7 @@ export function resolveSections(sections, map) {
 }
 
 export const TOKEN_HELP = [
-  "{{client.name}}", "{{client.contact}}", "{{project.title}}", "{{project.scope}}",
+  "{{client.name}}", "{{client.contact}}", "{{client.firstName}}", "{{project.title}}", "{{project.scope}}",
   "{{proposal.number}}", "{{proposal.validUntil}}", "{{date.today}}", "{{date.year}}",
-  "{{fee.subtotal}}", "{{rate.hourly}}", "{{business.name}}",
+  "{{fee.subtotal}}", "{{rate.hourly}}", "{{rate.daily}}", "{{business.name}}",
 ];

@@ -31,21 +31,36 @@ import { paginate } from "./paginate.js";
 const TAGLINE = "Port Moody, BC • tipolo.ca";
 const CONTACT = "hello@tipolo.ca | 604.729.0597";
 
-// Anything still in [brackets] is unfilled, so it prints red — impossible to send by
-// accident without noticing. Escaping happens first; this only wraps the result.
-function marks(escaped) {
-  return escaped.replace(/\[[^\[\]]*\]/g, (m) => `<span class="ph">${m}</span>`);
+// Inline formatting, written the way a writer would type it and applied AFTER escaping,
+// so the only tags in the output are the ones produced here — the stored text stays
+// plain and can never inject markup.
+//   **bold**   *italic*   __underline__
+function inline(escaped) {
+  // The outer pairs match up to their closing marker rather than to the next single
+  // one, so *italic* nested inside **bold** survives instead of splitting it.
+  return escaped
+    .replace(/\*\*((?:(?!\*\*)[^\n])+)\*\*/g, "<b>$1</b>")
+    .replace(/__((?:(?!__)[^\n])+)__/g, "<u>$1</u>")
+    .replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
 }
-const esc = (t) => marks(escapeHtml(t ?? ""));
+
+// Anything still in [brackets] is unfilled, so it prints red — impossible to send by
+// accident without noticing. The character class stops it swallowing the tags above.
+function marks(html) {
+  return html.replace(/\[[^\[\]<>]*\]/g, (m) => `<span class="ph">${m}</span>`);
+}
+
+const esc = (t) => marks(inline(escapeHtml(t ?? "")));
 
 /* Body copy -> paragraphs and lists.
 
-   A line beginning "• ", "- ", "1. " or "a) " is a list item; two leading spaces (or a
+   A line beginning "• ", "- ", "1. " or "a) " is a list item ("*" is italic, not a
+   bullet); two leading spaces (or a
    tab) step it in one level, matching the source document's 18pt indents. A following
    line that is indented but carries no marker is the same item wrapped onto a second
    line, not a new one — that is what the builder's Bullet/Number buttons produce and
    what a writer types by hand. Prose and lists can sit in the same paragraph. */
-const LIST_RE = /^([ \t]*)([•\u2022\-*]|\d+[.)]|[A-Za-z][.)])[ \t]+(.*)$/;
+const LIST_RE = /^([ \t]*)([•\u2022-]|\d+[.)]|[A-Za-z][.)])[ \t]+(.*)$/;
 const CONT_RE = /^[ \t]+\S/;
 
 const indentOf = (ws) => Math.min(Math.floor(ws.replace(/\t/g, "  ").length / 2), 3);
@@ -70,7 +85,7 @@ function prose(text, map, blkTag = "") {
       const m = line.match(LIST_RE);
       if (m) {
         flushText();
-        const marker = /^[-*]$/.test(m[2]) ? "•" : m[2];
+        const marker = m[2] === "-" ? "•" : m[2];
         items.push(`<div class="li lvl${indentOf(m[1])}"${blkTag}>`
           + `<span class="mk">${escapeHtml(marker)}</span>`
           + `<span class="tx">${esc(m[3])}</span></div>`);

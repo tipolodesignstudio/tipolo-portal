@@ -14,7 +14,7 @@ import {
 
 const COVER = [
   { part: "cover", level: 0, body:
-`Dear [First Name],
+`Dear {{client.firstName}},
 
 Tipolo Design Studio is pleased to submit a multimedia design services proposal for [Client Name]'s website redesign. Beyond the redesign, we understand that a well-executed migration from [current platform] to [new platform] will be essential to minimise your website's downtime.
 
