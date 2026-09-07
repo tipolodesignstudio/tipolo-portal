@@ -694,13 +694,6 @@ body.splitting { cursor: col-resize; user-select: none; }
   .builder-bar .bar-actions { width: 100%; margin-left: 0; }
 }
 
-/* The section under the cursor, echoed on the sheet. Screen only in practice: the print
-   path rebuilds the markup from scratch, so .hi never reaches paper. */
-.doc .section.hi {
-  box-shadow: -10px 0 0 -7px var(--accent);
-  transition: box-shadow .18s;
-}
-
 /* ============ proposal builder: the writing surface ============
    The left pane is meant to read like a word processor, not a form: document type,
    no boxes until you touch something, and the five parts of a Tipolo proposal as tabs.
@@ -829,13 +822,10 @@ table.mini .icon-btn:hover { background: var(--border-soft); color: var(--ink); 
 .wb-add { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
 
 /* the block your cursor is in, echoed on the sheet */
-/* The block the cursor is in, echoed on the page. A tint rather than a marker in the
-   margin — that read as a stray glyph next to the heading. */
-.doc [data-blk].hi {
-  background: rgba(var(--accent-rgb), .07);
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .07);
-  border-radius: 2px;
-}
+/* Nothing is drawn on the page to show where the cursor is. A margin marker read as a
+   stray glyph and a tint read as a stray fill — and since a block renders as several
+   elements, either one landed on just its first paragraph. The preview still scrolls to
+   the block you are editing; it simply does not mark it. */
 
 /* schedule scale toggle in the builder */
 .sched-scale {

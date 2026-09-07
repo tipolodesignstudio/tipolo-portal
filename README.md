@@ -85,8 +85,7 @@ the preview while you keep editing the raw text.
 
 The preview isn't a mock-up of the output — it *is* the output. `js/print/proposal-doc.js`
 builds the document markup, and both the preview pane and **Save as PDF** render that
-same markup under `css/document.css`. The only difference between the two is a highlight
-on whichever section your cursor is in.
+same markup under `css/document.css` — identical, with nothing added for the screen.
 
 The page is set on the Tipolo letterhead (`04_Templates/Letterhead Design/Tipolo
 Letterhead.docx`) — cream band, wordmark, dark contact bar, measured off the Word file.

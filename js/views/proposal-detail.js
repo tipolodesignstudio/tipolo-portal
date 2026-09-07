@@ -373,13 +373,6 @@ export async function render(root, ctx) {
     pagesLabel.textContent = `${n} page${n === 1 ? "" : "s"}`
       + (land ? ` · ${land} landscape` : "");
     if (zoomMode === "fit") applyZoom();
-    highlightPreview();
-  }
-
-  function highlightPreview() {
-    paper.querySelectorAll(".hi").forEach((el) => el.classList.remove("hi"));
-    if (activeBlk < 0) return;
-    paper.querySelector(`[data-blk="${activeBlk}"]`)?.classList.add("hi");
   }
 
   function scrollPreviewTo(i) {
@@ -483,7 +476,6 @@ export async function render(root, ctx) {
     if (i === activeBlk) return;
     activeBlk = i;
     editor.querySelectorAll(".wb").forEach((w) => w.classList.toggle("on", +w.dataset.i === i));
-    highlightPreview();
     scrollPreviewTo(i);
   });
   on(root, "click", ".wb [data-move]", (e, el) => {
