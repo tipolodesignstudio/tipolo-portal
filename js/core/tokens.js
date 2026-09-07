@@ -19,6 +19,11 @@ export function buildTokenMap({ client = {}, proposal = {}, settings = {} }) {
     "fee.subtotal": money(subtotal),
     "business.name": settings.business_name || "Tipolo Design Studio",
     "business.email": settings.email || "",
+    // Settings → Default hourly rate. Unset falls back to a bracket so it prints red
+    // rather than leaving a silent gap in the fee section.
+    "rate.hourly": settings.default_hourly_rate
+      ? money(settings.default_hourly_rate) : "[set the hourly rate in Settings]",
+    "date.year": String(new Date().getFullYear()),
   };
 }
 
@@ -41,6 +46,6 @@ export function resolveSections(sections, map) {
 
 export const TOKEN_HELP = [
   "{{client.name}}", "{{client.contact}}", "{{project.title}}", "{{project.scope}}",
-  "{{proposal.number}}", "{{proposal.validUntil}}", "{{date.today}}", "{{fee.subtotal}}",
-  "{{business.name}}",
+  "{{proposal.number}}", "{{proposal.validUntil}}", "{{date.today}}", "{{date.year}}",
+  "{{fee.subtotal}}", "{{rate.hourly}}", "{{business.name}}",
 ];

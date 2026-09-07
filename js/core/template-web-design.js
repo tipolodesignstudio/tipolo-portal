@@ -171,7 +171,7 @@ export function webDesignSections() {
 
 export function webDesignLineItems() {
   return TASK_NAMES.map((t) => ({
-    description: `${t.replace(/^Task \d+: /, "")} (approx. [n] hrs)`,
+    description: t.replace(/^Task \d+: /, ""),
     qty: 0, unit_price: 0,
   }));
 }

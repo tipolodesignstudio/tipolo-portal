@@ -142,19 +142,25 @@ function paymentTable(rows = [], subtotal = 0) {
   }).join("");
 }
 
+// Hours have their own column rather than being written into each description, so the
+// figure the builder holds is the figure that prints and the two cannot disagree.
 function feeTable(items) {
   const subtotal = items.reduce((s, li) => s + lineAmount(li), 0);
   const hours = items.reduce((s, li) => s + (Number(li.qty) || 0), 0);
+  const hrs = (n) => (Number(n) ? num(Number(n), Number(n) % 1 ? 1 : 0) : "");
   return `<table class="fees"><thead><tr>
-      <th class="ix"></th><th>Task Description and Timeline</th><th class="fee">Fee</th>
+      <th class="ix"></th><th>Task Description and Timeline</th>
+      <th class="hrs">Approx. Hrs</th><th class="fee">Fee</th>
     </tr></thead><tbody>
     ${items.map((li, i) => `<tr>
       <td class="ix">${i + 1}</td>
       <td>${esc(li.description)}</td>
+      <td class="hrs">${hrs(li.qty)}</td>
       <td class="fee">${money(lineAmount(li))}</td></tr>`).join("")}
     <tr class="total">
       <td class="ix"></td>
-      <td>TOTAL${hours ? ` (approx. ${num(hours, 0)} hrs)` : ""}</td>
+      <td>TOTAL</td>
+      <td class="hrs">${hrs(hours)}</td>
       <td class="fee">${money(subtotal)}</td></tr>
   </tbody></table>`;
 }
@@ -162,11 +168,12 @@ function feeTable(items) {
 function optionalTable(rows = []) {
   if (!rows.length) return "";
   return `<table class="fees"><thead><tr>
-      <th class="ix"></th><th>Description</th><th class="fee">Fee</th>
+      <th class="ix"></th><th>Description</th><th class="hrs"></th><th class="fee">Fee</th>
     </tr></thead><tbody>
     ${rows.map((r) => `<tr>
       <td class="ix">${esc(r.code)}</td>
       <td>${esc(r.description)}</td>
+      <td class="hrs"></td>
       <td class="fee">${esc(r.fee)}</td></tr>`).join("")}
   </tbody></table>`;
 }

@@ -320,6 +320,7 @@
 }
 .doc table.fees td { padding: 4pt 6pt; border-bottom: 1px solid #E6E2D6; }
 .doc table.fees .ix { width: 22pt; color: var(--lh-muted); }
+.doc table.fees .hrs { width: 0.72in; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .doc table.fees .fee { width: 1.05in; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .doc table.fees tr.total td { border-bottom: none; border-top: 1.2px solid var(--lh-bark); font-weight: 500; }
 .doc table.fees, .doc table.sched { margin-left: 18pt; width: calc(100% - 18pt); }
