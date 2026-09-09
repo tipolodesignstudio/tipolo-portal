@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8"><title>invoice builder check</title>
+<!--
+  Mounts the invoice builder against stubbed PostgREST responses, so the split editor,
+  the budget cap and the live preview can be exercised without the live database.
+  Open it at http://localhost:4173/dev/invoice-builder-check.html
+  Nothing here ships with the app.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/document.css">
+<style>html,body{height:100%;margin:0} #app{height:100%}
+  #err{position:fixed;bottom:0;left:0;right:0;z-index:99;background:#F5E3DC;color:#B3341C;
+       font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;padding:8px}</style>
+<div id="app"></div>
+<div id="err" hidden></div>
+<script type="module">
+  const err = document.getElementById("err");
+  const fail = (m) => { err.hidden = false; err.textContent += m + "\n"; };
+  window.addEventListener("error", (e) => fail(e.message));
+  window.addEventListener("unhandledrejection", (e) => fail(String(e.reason)));
+
+  const CLIENT = {
+    id: "c1", name: "Connect Landscape Architecture", is_individual: false,
+    street: "2305 Hemlock Street", city: "Vancouver", province: "BC",
+    contacts: [{ name: "Ken Larsson", title: "Sr. Principal", is_primary: true }],
+  };
+  const INVOICE = {
+    id: "i2", number: null, status: "draft", project_id: "p1",
+    issue_date: "2026-09-09", due_date: "2026-09-11",
+    prepared_by: "Jovi Francesca Jose", apply_taxes: false,
+    created_at: "2026-09-09T00:00:00Z",
+    subtotal: 0, tax_total: 0, total: 0, tax_lines: [], line_items: [],
+    sections: null,     // exercises the fall-back to the house sections
+    progress_lines: [
+      { id: "1", description: "Task 1 | Template Exploration & Mock-ups", budget: 1020, amount: 0 },
+      { id: "2", description: "Task 2 | Website Design & Content Migration", budget: 2720, amount: 0 },
+      { id: "3", description: "Task 3 | Archiving Process", budget: 680, amount: 0 },
+      { id: "4", description: "Task 4 | Website Launch", budget: 425, amount: 0 },
+    ],
+    project: { id: "p1", number: "26102", title: "Connect Landscape Architecture Website Redesign",
+               scope: "multimedia", contact: null, client: CLIENT },
+  };
+  // Invoice 001 already drew $970 against Task 1.
+  const EARLIER = [{
+    id: "i1", status: "sent", created_at: "2026-09-01T00:00:00Z",
+    progress_lines: [{ id: "1", description: "Task 1", amount: 970 }],
+  }];
+  const SETTINGS = {
+    id: 1, business_name: "Tipolo Design Studio", currency: "CAD",
+    tax_lines: [{ label: "GST", rate: 5, enabled: true }, { label: "PST", rate: 7, enabled: true }],
+  };
+
+  const real = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (url.includes("/rest/v1/")) {
+      const json = (b) => new Response(JSON.stringify(b),
+        { status: 200, headers: { "content-type": "application/json" } });
+      if (url.includes("app_settings")) return json(SETTINGS);
+      if (url.includes("project_id=eq.")) return json(EARLIER);
+      if (url.includes("invoices") && url.includes("id=eq.")) {
+        if ((init?.method || "GET") !== "GET") {
+          console.log("[stub] write", init.method, JSON.parse(init.body));
+          return json(INVOICE);
+        }
+        return json(INVOICE);
+      }
+      return json([]);
+    }
+    return real(input, init);
+  };
+
+  const { render } = await import("../js/views/invoice-detail.js");
+  await render(document.getElementById("app"), {
+    params: { id: "i2" }, path: "/invoices/i2",
+    setCrumbs() {}, navigate(p) { console.log("[stub] navigate", p); },
+  });
+</script>

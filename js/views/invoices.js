@@ -4,8 +4,12 @@ import { escapeHtml, money, date, isoDate } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
   listInvoices, listProjectsForInvoicing, buildTimeLineItems, createInvoice, getSettings,
+  projectBudget, getMyProfile,
 } from "../core/api.js";
-import { computeTotals } from "../core/invoice-calc.js";
+import { computeProgressTotals, lineAmount } from "../core/invoice-calc.js";
+import {
+  defaultInvoiceSections, budgetLinesFromProposal, newLineId,
+} from "../core/invoice-template.js";
 import { openModal } from "../components/modal.js";
 import { field, select } from "../components/form.js";
 import { toastErr } from "../components/toast.js";
@@ -92,13 +96,16 @@ function empty() {
     <p class="faint">Create one from a project's unbilled time or from scratch.</p></div>`;
 }
 
-/* ---- new invoice: pick project, pull its unbilled time, create draft ---- */
+/* ---- new invoice: pick a project, take its budget from the proposal, create draft ----
+   The budget column is the proposal's fee schedule. Unbilled time and expenses can be
+   added as their own lines; they are billed in full, so their budget is their amount. */
 export async function newInvoiceFlow(ctx, presetProjectId = "") {
-  let projects, settings;
+  let projects, settings, profile;
   try {
-    [projects, settings] = await Promise.all([
+    [projects, settings, profile] = await Promise.all([
       listProjectsForInvoicing(),
       getSettings().catch(() => ({})),
+      getMyProfile().catch(() => null),
     ]);
   } catch (err) { toastErr(err.message); return; }
 
@@ -109,6 +116,8 @@ export async function newInvoiceFlow(ctx, presetProjectId = "") {
     return;
   }
 
+  const taxes = (settings.tax_lines || []).filter((t) => t.enabled);
+
   const result = await openModal({
     title: "New invoice",
     confirmText: "Create draft",
@@ -118,37 +127,60 @@ export async function newInvoiceFlow(ctx, presetProjectId = "") {
           value: p.id,
           label: `${p.number ? p.number + " · " : ""}${p.title}${p.client?.name ? ` — ${p.client.name}` : ""}`,
         })), { required: true })}
+      <div class="hint">The budget column comes from the proposal this project was
+        converted from. Without one, you type the lines in the builder.</div>
       <label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
-        <input type="checkbox" name="pull_time" checked style="width:auto" />
-        Pull unbilled billable time into line items
+        <input type="checkbox" name="pull_time" style="width:auto" />
+        Also add unbilled billable time as its own line
       </label>
       <label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
-        <input type="checkbox" name="pull_expenses" checked style="width:auto" />
-        Pull unbilled billable expenses (with markup) into line items
+        <input type="checkbox" name="pull_expenses" style="width:auto" />
+        Also add unbilled billable expenses (with markup)
       </label>
+      ${taxes.length ? `<label style="display:flex;gap:8px;align-items:center;font-size:.9rem">
+        <input type="checkbox" name="apply_taxes" style="width:auto" />
+        Add ${escapeHtml(taxes.map((t) => t.label).join(" + "))} — off by default, as on the
+        house invoice
+      </label>` : ""}
       ${field("issue_date", "Issue date", isoDate(), { type: "date", required: true })}
     </form>`,
     onConfirm: async (dlg) => {
       const f = new FormData(dlg.querySelector("form"));
       const projectId = f.get("project_id");
 
-      let lineItems = [];
-      if (f.get("pull_time") === "on") lineItems.push(...(await buildTimeLineItems(projectId)).lineItems);
+      const proposal = await projectBudget(projectId).catch(() => null);
+      const lines = budgetLinesFromProposal(proposal?.line_items || []);
+
+      const asProgress = (li) => ({
+        id: newLineId(),
+        description: li.description || "",
+        budget: lineAmount(li),
+        amount: lineAmount(li),
+        source_time_entry_ids: li.source_time_entry_ids || [],
+        source_expense_ids: li.source_expense_ids || [],
+      });
+      if (f.get("pull_time") === "on") {
+        lines.push(...(await buildTimeLineItems(projectId)).lineItems.map(asProgress));
+      }
       if (f.get("pull_expenses") === "on") {
         const { buildExpenseLineItems } = await import("../core/api.js");
-        lineItems.push(...(await buildExpenseLineItems(projectId)).lineItems);
+        lines.push(...(await buildExpenseLineItems(projectId)).lineItems.map(asProgress));
       }
 
-      const totals = computeTotals(lineItems, settings.tax_lines || []);
+      const applyTaxes = f.get("apply_taxes") === "on";
+      const totals = computeProgressTotals(lines, settings.tax_lines || [], applyTaxes);
       return await createInvoice({
         project_id: projectId,
         issue_date: f.get("issue_date"),
-        line_items: lineItems,
+        progress_lines: lines,
+        line_items: [],
+        sections: defaultInvoiceSections(),
+        prepared_by: profile?.full_name || null,
+        apply_taxes: applyTaxes,
         tax_lines: totals.taxLines,
         subtotal: totals.subtotal,
         tax_total: totals.taxTotal,
         total: totals.total,
-        notes: settings.payment_terms || null,
         status: "draft",
       });
     },

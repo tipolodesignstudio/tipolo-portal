@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8"><title>invoice document check</title>
+<!--
+  Renders the invoice document from a made-up invoice, so the layout can be checked
+  against 04_Templates/Invoice/Invoice Down Payment Template.docx without touching the
+  live database. Open it at http://localhost:4173/dev/invoice-check.html
+  Nothing here ships with the app.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/document.css">
+<style>
+  body { margin: 0; background: #e9e6dd; font-family: Roboto, sans-serif; }
+  #out { padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  .sheet-page { box-shadow: 0 2px 14px rgba(0,0,0,.22); }
+  #err { padding: 16px; color: #B3341C; font: 13px/1.5 ui-monospace, Menlo, monospace; white-space: pre-wrap; }
+</style>
+<div id="err"></div>
+<div id="out"></div>
+<script type="module">
+  const err = document.getElementById("err");
+  try {
+    const { invoiceDocHtml } = await import("../js/print/invoice-doc.js");
+    const { defaultInvoiceSections } = await import("../js/core/invoice-template.js");
+
+    // The ConnectLA down-payment invoice, figure for figure.
+    const inv = {
+      number: "26102-001",
+      issue_date: "2026-09-09",
+      due_date: "2026-09-11",
+      prepared_by: "Jovi Francesca Jose",
+      apply_taxes: false,
+      sections: defaultInvoiceSections(),
+      progress_lines: [
+        { id: "1", description: "Task 1 | Template Exploration & Mock-ups", budget: 1020, amount: 970 },
+        { id: "2", description: "Task 2 | Website Design & Content Migration", budget: 2720, amount: 0 },
+        { id: "3", description: "Task 3 | Archiving Process", budget: 680, amount: 0 },
+        { id: "4", description: "Task 4 | Website Launch", budget: 425, amount: 0 },
+      ],
+      project: {
+        number: "26102",
+        title: "Connect Landscape Architecture Website Redesign",
+        client: {
+          name: "Connect Landscape Architecture",
+          street: "2305 Hemlock Street", city: "Vancouver", province: "BC",
+          contacts: [{ name: "Ken Larsson", title: "Sr. Principal", is_primary: true }],
+        },
+      },
+    };
+    const settings = { business_name: "Tipolo Design Studio", tax_lines: [] };
+    document.getElementById("out").innerHTML =
+      invoiceDocHtml(inv, settings, { previous: [0, 0, 0, 0] });
+  } catch (e) {
+    err.textContent = `${e.message}\n${e.stack || ""}`;
+  }
+</script>

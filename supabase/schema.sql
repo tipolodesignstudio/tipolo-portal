@@ -431,7 +431,7 @@ begin
   end loop;
 end $$;
 
--- ---- next_invoice_number(project): YYNNN-XX ----
+-- ---- next_invoice_number(project): YYNNN-XXX ----
 drop function if exists public.next_invoice_number();
 create or replace function public.next_invoice_number(p_project_id uuid)
 returns text
@@ -450,7 +450,7 @@ begin
   seq := p.next_invoice_seq;
   update public.projects set next_invoice_seq = seq + 1 where id = p_project_id;
 
-  return p.number || '-' || lpad(seq::text, 2, '0');
+  return p.number || '-' || lpad(seq::text, 3, '0');
 end;
 $$;
 grant execute on function public.next_invoice_number(uuid) to authenticated;
@@ -466,7 +466,15 @@ create table if not exists public.invoices (
   issue_date     date not null default current_date,
   due_date       date,
   line_items     jsonb not null default '[]'::jsonb,
-    -- [{ description, qty, unit_price, kind:'time'|'fixed', source_time_entry_ids:[uuid] }]
+    -- legacy: [{ description, qty, unit_price, kind:'time'|'fixed', source_time_entry_ids:[uuid] }]
+  progress_lines jsonb not null default '[]'::jsonb,
+    -- [{ id, description, budget, amount, source_time_entry_ids[], source_expense_ids[] }]
+    --   budget  agreed fee for the line, snapshotted when the invoice is drafted
+    --   amount  this invoice's draw ("Current Invoice"); previous draws are summed
+    --           from the project's earlier invoices at render time
+  sections       jsonb not null default '[]'::jsonb,  -- the editable document blocks
+  prepared_by    text,
+  apply_taxes    boolean not null default true,
   tax_lines      jsonb not null default '[]'::jsonb, -- [{ label, rate, amount }] snapshot
   subtotal       numeric(12,2) not null default 0,
   tax_total      numeric(12,2) not null default 0,

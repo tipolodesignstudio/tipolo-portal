@@ -42,6 +42,7 @@ That one file bundles every migration:
 | `0017_signature.sql` | Cover-letter signature image on Settings |
 | `0018_branding_select.sql` | Lets the app delete/replace logo + signature files |
 | `0019_day_rate.sql` | Day rate on Settings (defaults to hourly x 8) |
+| `0020_invoice_document.sql` | The invoice as a document: progress lines, editable sections, `YYNNN-XXX` numbering |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,

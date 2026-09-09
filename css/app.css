@@ -868,3 +868,24 @@ table.mini input[type=date] { font-variant-numeric: tabular-nums; }
   width: 1px; align-self: stretch; background: var(--border-soft); margin: 2px 3px;
 }
 .wb-format button[data-wrap] { min-width: 24px; text-align: center; }
+
+/* ---- the invoice's progress table ----
+   Budget and Current are typed; Previous and Balance are worked out, so they are set
+   as plain figures rather than fields. A draw that would overrun the line's remaining
+   budget is capped as you type, and the field flashes. */
+table.mini.prog td.cur { display: flex; align-items: center; gap: 4px; }
+table.mini.prog td.cur input { flex: 1; min-width: 0; }
+table.mini.prog td.cur .btn.link { padding: 0 2px; font-size: .72rem; }
+table.mini.prog td.prev, table.mini.prog td.bal { color: var(--ink-faint); text-align: right; }
+table.mini.prog tfoot th {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  padding-top: 5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+table.mini.prog tfoot th:first-child { text-align: left; }
+table.mini input.bad {
+  border-color: #B3341C;
+  box-shadow: 0 0 0 2px rgba(179, 52, 28, .15);
+}

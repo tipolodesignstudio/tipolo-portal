@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "_comment": [
+    "Attach-only, like the parent site's: the preview launcher's sandbox cannot read",
+    "this folder (Google Drive CloudStorage returns EPERM on open()), so it must not",
+    "start the server itself. Start it from a shell first:",
+    "  python3 '../.claude/serve.py' 4176 &   (run from the portal folder)",
+    "then preview_start attaches to it."
+  ],
+  "configurations": [
+    {
+      "name": "portal",
+      "url": "http://localhost:4176",
+      "port": 4176
+    }
+  ]
+}

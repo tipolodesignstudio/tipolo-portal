@@ -341,7 +341,59 @@
 }
 .doc .sig-cap { font-size: 8pt; color: var(--lh-muted); padding-top: 3pt; }
 
-/* ---------- invoice-only bits ---------- */
+/* ---------- the invoice ----------
+   From 04_Templates/Invoice/Invoice Down Payment Template.docx. The table there is an
+   embedded Excel sheet, 7in wide (exactly the letterhead's text measure) — description
+   3.4in, then four money columns of 0.9in; a 0.375in header band in the studio green
+   with white 9pt caps; 0.2in rows separated by hairlines, and a black rule above the
+   SUBTOTAL row. Figures are set the way the sheet sets them: the dollar sign pinned to
+   the left of the cell, the number to the right. */
+.doc.invoice { --inv-head: #3F4A20; --inv-rule: #D0D0D0; --inv-soft: #808080; }
+
+.doc .billto { margin: 0 0 12pt; }
+.doc .billto .who { font-style: italic; }
+.doc .billto .org { font-weight: 700; }
+
+.doc table.inv {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 4pt 0 12pt;
+  font-size: 9pt;
+  font-variant-numeric: tabular-nums;
+}
+.doc table.inv th {
+  height: 27pt;
+  padding: 0 4pt;
+  background: var(--inv-head);
+  color: #fff;
+  font-weight: 700;
+  font-size: 9pt;
+  line-height: 1.1;
+  text-align: center;
+  vertical-align: middle;
+  width: 12.85%;
+}
+.doc table.inv th.d { width: 48.6%; }
+.doc table.inv td {
+  height: 15pt;
+  padding: 0;
+  border-bottom: 1px solid var(--inv-rule);
+  vertical-align: middle;
+}
+.doc table.inv td.d { padding-left: 3pt; }
+.doc table.inv td.empty { color: var(--inv-soft); }
+/* The rule under the last task row is the black one the sheet draws above SUBTOTAL. */
+.doc table.inv tr.last td { border-bottom: 1px solid #000; }
+.doc table.inv tr.sub td { border-bottom: none; font-weight: 700; }
+.doc table.inv tr.sub td.d { text-align: right; padding-right: 0; }
+.doc table.inv tr.due td { border-top: 1px solid #000; }
+/* Previous and Balance are worked out, not billed — the sheet greys them. */
+.doc table.inv td.prev, .doc table.inv td.bal { color: var(--inv-soft); }
+.doc table.inv .acct { display: flex; justify-content: space-between; padding: 0 4pt 0 5pt; }
+.doc table.inv .acct .c { padding-right: 6pt; }
+
+/* ---------- older invoice layout (pre-letterhead) ---------- */
 .doc .parties { display: flex; gap: 40px; margin: 20px 0 26px; font-size: 10.5pt; }
 .doc .parties h4 { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .06em; color: #888; margin-bottom: 4px; }
 .doc table.lines { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 10.5pt; }

@@ -417,19 +417,20 @@ export async function updateInvoice(id, patch) {
   return unwrap(await supabase.from("invoices").update(patch).eq("id", id).select(INVOICE_SELECT).single());
 }
 
-// Finalize a draft: assign the next number (YYNNN-XX), link its time entries, set status.
+// Finalize a draft: assign the next number (YYNNN-XXX), link its time entries, set status.
 export async function finalizeInvoice(inv) {
   const { data: number, error: numErr } =
     await supabase.rpc("next_invoice_number", { p_project_id: inv.project_id });
   if (numErr) throw new Error(numErr.message);
 
-  const teIds = (inv.line_items || []).flatMap((li) => li.source_time_entry_ids || []);
+  const sources = [...(inv.progress_lines || []), ...(inv.line_items || [])];
+  const teIds = sources.flatMap((li) => li.source_time_entry_ids || []);
   if (teIds.length) {
     const { error } = await supabase.from("time_entries")
       .update({ invoice_id: inv.id }).in("id", teIds);
     if (error) throw new Error(error.message);
   }
-  const exIds = (inv.line_items || []).flatMap((li) => li.source_expense_ids || []);
+  const exIds = sources.flatMap((li) => li.source_expense_ids || []);
   if (exIds.length) {
     const { error } = await supabase.from("expenses")
       .update({ invoice_id: inv.id }).in("id", exIds);
@@ -451,6 +452,45 @@ export async function markInvoicePaid(id, { paid_date, payment_method }) {
 
 export async function reopenInvoice(id) {
   return updateInvoice(id, { status: "sent", paid_date: null });
+}
+
+/* ---- progress invoices ----
+   The budget column comes from the proposal this project was converted from, and the
+   "Previous Invoice" column from the project's earlier invoices. Both are read here so
+   the builder and the printed page work from the same figures. */
+
+// The fee schedule this project was sold on. The newest proposal wins if there is more
+// than one; a project created by hand has none, and the budget is typed in the builder.
+export async function projectBudget(projectId) {
+  const rows = unwrap(
+    await supabase.from("proposals")
+      .select("id, number, line_items, created_at")
+      .eq("converted_project_id", projectId)
+      .order("created_at", { ascending: false }).limit(1)
+  );
+  return rows[0] || null;
+}
+
+// How much each line has already been billed, keyed by lineKey(). Drafts are left out:
+// nothing has been billed until an invoice is finalized, and two open drafts would
+// otherwise each count the other.
+export async function previousDraws(projectId, invoiceId, createdAt) {
+  const rows = unwrap(
+    await supabase.from("invoices")
+      .select("id, status, created_at, progress_lines")
+      .eq("project_id", projectId)
+  );
+  const totals = new Map();
+  for (const r of rows) {
+    if (r.id === invoiceId) continue;
+    if (r.status === "draft") continue;
+    if (createdAt && r.created_at >= createdAt) continue;
+    for (const li of r.progress_lines || []) {
+      const k = li.id || `d:${(li.description || "").trim().toLowerCase()}`;
+      totals.set(k, (totals.get(k) || 0) + (Number(li.amount) || 0));
+    }
+  }
+  return totals;
 }
 
 // Delete an invoice; time entries are released automatically by the FK (on delete set null).

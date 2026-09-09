@@ -53,9 +53,10 @@ vendor/pdf.min.mjs         vendored pdf.js (+ pdf.worker.min.mjs) — proposal P
 js/app.js                  bootstrap: config check → auth gate → shell + router
 js/core/       supabase, auth, router, render, format, api, tokens,
                pdf-text + proposal-parse (PDF import),
-               proposal-template (the house proposal), gantt (schedule layout)
-js/print/      proposal-doc (the document), paginate (pages), proposal-print,
-               invoice-print
+               proposal-template (the house proposal), invoice-template (the house
+               invoice), invoice-calc (the money), gantt (schedule layout)
+js/print/      proposal-doc + invoice-doc (the documents), doc-text (body copy ->
+               markup, shared), paginate (pages), proposal-print, invoice-print
 js/components/  layout (shell), modal, toast
 js/views/      login, dashboard, settings, soon (placeholder for later phases)
 supabase/migrations/       SQL — run in the Supabase SQL editor, in order
@@ -74,6 +75,7 @@ dev/                       local parser check (not used by the app)
 | 5 | Expenses (project & business, re-billable) | ✅ built |
 | — | Proposal PDF import (read a PDF into a draft, or save it as a template) | ✅ built |
 | — | Proposal builder: split editor + live print preview, house format, gantt schedule | ✅ built |
+| — | Invoice builder: the same split workspace, progress billing against the proposal | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
 
@@ -131,6 +133,39 @@ services agreement with the standard one rather than copying them.
 A template stores the same blocks a proposal does, so the schedule chart, fee tables and
 signature survive the round trip. The template editor shows those as labelled rows — they
 are edited on the proposal itself, not in the template.
+
+## The invoice builder
+
+Opening an invoice gives the same two-pane workspace as a proposal: the document on the
+left, the page the client will receive on the right. `js/print/invoice-doc.js` builds
+the markup, and both the preview and **Save as PDF** render it — the file is offered as
+`Invoice_YYNNN-XXX.pdf`.
+
+The page follows `04_Templates/Invoice/Invoice Down Payment Template.docx`: the same
+letterhead as the proposal (with "Invoice" and the control number in the band), a
+**Bill To** block taken from the client record, the invoice table, and the payment
+information underneath — all of which is ordinary text you can edit.
+
+**The table is a progress bill.**
+
+| Column | Where it comes from |
+|---|---|
+| Description | the fee schedule of the proposal this project came from |
+| Budget | that line's agreed fee, snapshotted onto the invoice |
+| Previous Invoice | the same line's draws on the project's earlier invoices, summed |
+| Current Invoice | **the one thing you type** |
+| Balance | budget − previous − current |
+
+Only finalized invoices count towards "previous" — an open draft has billed nothing.
+Typing more than a line has left is refused: the figure is capped at the remainder and
+the field flashes, so an invoice can never overrun the budget it is drawn against.
+
+Tax is off unless you turn it on. The house invoice shows a subtotal and nothing else;
+tick **Add GST + PST** on the Bill To tab (or when creating the invoice) and the rows,
+and a TOTAL DUE, appear under the subtotal.
+
+Numbering is `YYNNN-XXX` — the project's job number, then a per-project counter from
+`001`, assigned by `next_invoice_number()` when the invoice is finalized.
 
 ## Importing a proposal from a PDF
 

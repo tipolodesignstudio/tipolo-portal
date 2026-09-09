@@ -19,7 +19,8 @@
   /* Ask for the bands, bars and gantt bars to be painted rather than dropped
      as "background graphics". */
   #print-root .lh-band, #print-root .lh-bar,
-  #print-root .g-bar, #print-root .g-mile i {
+  #print-root .g-bar, #print-root .g-mile i,
+  #print-root table.inv th {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

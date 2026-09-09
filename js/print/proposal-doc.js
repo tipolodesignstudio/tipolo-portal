@@ -20,6 +20,7 @@
 import { escapeHtml, money, num, date, longDate } from "../core/format.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { buildTokenMap, resolveTokens } from "../core/tokens.js";
+import { esc, prose } from "./doc-text.js";
 import { clientPrimaryContact } from "../core/api.js";
 import { normaliseSections } from "../core/proposal-template.js";
 import { buildGantt } from "../core/gantt.js";
@@ -30,79 +31,6 @@ import { paginate } from "./paginate.js";
 // as constants — change them here and both the preview and the print follow.
 const TAGLINE = "Port Moody, BC • tipolo.ca";
 const CONTACT = "hello@tipolo.ca | 604.729.0597";
-
-// Inline formatting, written the way a writer would type it and applied AFTER escaping,
-// so the only tags in the output are the ones produced here — the stored text stays
-// plain and can never inject markup.
-//   **bold**   *italic*   __underline__
-function inline(escaped) {
-  // The outer pairs match up to their closing marker rather than to the next single
-  // one, so *italic* nested inside **bold** survives instead of splitting it.
-  return escaped
-    .replace(/\*\*((?:(?!\*\*)[^\n])+)\*\*/g, "<b>$1</b>")
-    .replace(/__((?:(?!__)[^\n])+)__/g, "<u>$1</u>")
-    .replace(/\*([^*\n]+)\*/g, "<i>$1</i>");
-}
-
-// Anything still in [brackets] is unfilled, so it prints red — impossible to send by
-// accident without noticing. The character class stops it swallowing the tags above.
-function marks(html) {
-  return html.replace(/\[[^\[\]<>]*\]/g, (m) => `<span class="ph">${m}</span>`);
-}
-
-const esc = (t) => marks(inline(escapeHtml(t ?? "")));
-
-/* Body copy -> paragraphs and lists.
-
-   A line beginning "• ", "- ", "1. " or "a) " is a list item ("*" is italic, not a
-   bullet); two leading spaces (or a
-   tab) step it in one level, matching the source document's 18pt indents. A following
-   line that is indented but carries no marker is the same item wrapped onto a second
-   line, not a new one — that is what the builder's Bullet/Number buttons produce and
-   what a writer types by hand. Prose and lists can sit in the same paragraph. */
-const LIST_RE = /^([ \t]*)([•\u2022-]|\d+[.)]|[A-Za-z][.)])[ \t]+(.*)$/;
-const CONT_RE = /^[ \t]+\S/;
-
-const indentOf = (ws) => Math.min(Math.floor(ws.replace(/\t/g, "  ").length / 2), 3);
-
-function prose(text, map, blkTag = "") {
-  const src = resolveTokens(text || "", map);
-  if (!src.trim()) return "";
-  const out = [];
-
-  for (const para of src.split(/\n{2,}/)) {
-    let buf = [];      // plain lines waiting to become a <p>
-    let items = [];    // the run of list items being built
-
-    const flushText = () => {
-      if (!buf.length) return;
-      out.push(`<p${blkTag}>${buf.map((l) => esc(l.trim())).join("<br>")}</p>`);
-      buf = [];
-    };
-    const flushList = () => { out.push(...items); items = []; };
-
-    for (const line of para.split("\n")) {
-      const m = line.match(LIST_RE);
-      if (m) {
-        flushText();
-        const marker = m[2] === "-" ? "•" : m[2];
-        items.push(`<div class="li lvl${indentOf(m[1])}"${blkTag}>`
-          + `<span class="mk">${escapeHtml(marker)}</span>`
-          + `<span class="tx">${esc(m[3])}</span></div>`);
-      } else if (items.length && CONT_RE.test(line)) {
-        // wrapped continuation of the item above
-        items[items.length - 1] = items[items.length - 1]
-          .replace(/<\/span><\/div>$/, ` ${esc(line.trim())}</span></div>`);
-      } else {
-        flushList();
-        buf.push(line);
-      }
-    }
-    flushText();
-    flushList();
-  }
-  return out.join("");
-}
 
 // The schedule always prints as a gantt chart. With no dates set it draws the frame and
 // says so, rather than dropping back to a table.
