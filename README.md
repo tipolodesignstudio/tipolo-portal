@@ -190,9 +190,22 @@ Numbering is `YYNNN-XXX` — the project's job number, then a per-project counte
 
 **Proposals → Import PDF.** The PDF is read in the browser (`pdf.js` is vendored, same as
 the Supabase client) and `js/core/proposal-parse.js` turns it into a draft: title, client,
-scope, sections and fee lines. Nothing is saved until you review it and press
-**Create draft proposal** — or **Save as template**, which stores the same sections and
-fee lines under Proposals → Templates with the client's name swapped for `{{client.name}}`.
+scope, phases, sections and fee lines.
+
+It then asks **what should come across**:
+
+- **Phases & fees only** — the task list and the fee schedule, nothing else. The phases
+  become the Work Plan headings and the rows of the schedule chart (undated, so the
+  chart prints its red "set the dates" prompt rather than inventing a programme). The
+  wording is not imported: the PDF is attached instead, and can be read as it was
+  written. That attachment is not optional here, and it follows the proposal into its
+  project when the proposal is converted — **original PDF** sits in the header of both.
+- **The whole document** — also brings the prose across as editable sections, for a
+  proposal you mean to rewrite in the builder.
+
+Nothing is saved until you review it and press **Create draft proposal** — or, in whole-
+document mode, **Save as template**, which stores the same sections and fee lines under
+Proposals → Templates with the client's name swapped for `{{client.name}}`.
 
 Everything is read in your browser — the PDF is never sent anywhere. A document laid out
 unlike your usual proposals, or a scan with no text layer, will come back mostly empty;

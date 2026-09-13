@@ -1,0 +1,68 @@
+<!doctype html>
+<meta charset="utf-8"><title>proposal import check</title>
+<!--
+  Runs the PDF import view against a real PDF and stubbed PostgREST/Storage, so the
+  "what should come across?" question and the phases-only path can be exercised without
+  the live database. ?pdf=<name> picks another file in this folder.
+  Open it at http://localhost:4173/dev/import-check.html
+  Nothing here ships with the app.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<style>body{margin:0;background:var(--bg,#F5F2E9)} #app{max-width:940px;margin:0 auto;padding:24px}
+  #err{position:fixed;bottom:0;left:0;right:0;z-index:99;background:#F5E3DC;color:#B3341C;
+       font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;padding:8px}</style>
+<div id="app"></div>
+<div id="err" hidden></div>
+<script type="module">
+  const err = document.getElementById("err");
+  const fail = (m) => { err.hidden = false; err.textContent += m + "\n"; };
+  window.addEventListener("error", (e) => fail(e.message));
+  window.addEventListener("unhandledrejection", (e) => fail(String(e.reason)));
+
+  const created = [];
+  window.__created = created;
+
+  const real = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    const json = (b) => new Response(JSON.stringify(b),
+      { status: 200, headers: { "content-type": "application/json" } });
+    if (url.includes("/storage/v1/")) return json({ Key: "proposal-sources/stub.pdf", path: "stub.pdf" });
+    if (!url.includes("/rest/v1/")) return real(input, init);
+    const method = (init?.method || "GET").toUpperCase();
+    const body = init?.body ? JSON.parse(init.body) : null;
+    if (url.includes("app_settings")) return json({ id: 1, business_name: "Tipolo Design Studio", currency: "CAD", hours_per_day: 8 });
+    if (url.includes("staff_tiers")) return json([]);
+    if (url.includes("clients") && method === "GET") return json([]);
+    if (url.includes("proposals") && method === "POST") {
+      created.push(body);
+      return json({ ...body, id: "p1", number: "26103" });
+    }
+    if (method === "POST") return json({ ...body, id: "x1" });
+    return json([]);
+  };
+
+  // Storage and auth, stubbed at the client rather than at fetch: supabase-js reaches
+  // for a session before it uploads, and there isn't one here.
+  const { supabase } = await import("../js/core/supabase.js");
+  supabase.auth.getSession = async () => ({ data: { session: { user: { id: "u1" } } } });
+  supabase.storage.from = () => ({
+    upload: async (path) => { window.__uploaded = path; return { data: { path }, error: null }; },
+  });
+
+  const name = new URLSearchParams(location.search).get("pdf") || "sample-proposal.pdf";
+  const { render } = await import("../js/views/proposal-import.js");
+  await render(document.getElementById("app"), { setCrumbs() {}, navigate(p) { console.log("[stub] navigate", p); } });
+
+  // Feed the PDF in as if it had been chosen.
+  const res = await fetch("./" + name);
+  const file = new File([await res.blob()], name, { type: "application/pdf" });
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  const input = document.querySelector("#pdf");
+  input.files = dt.files;
+  input.dispatchEvent(new Event("change"));
+</script>

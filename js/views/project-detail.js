@@ -2,7 +2,7 @@
 // fill in during later phases).
 import { escapeHtml, money, date, minutesToHM, minutesToHours, STATUS_LABELS, STATUS_TONE } from "../core/format.js";
 import { on } from "../core/render.js";
-import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices, listProjectProposals, listProjectExpenses } from "../core/api.js";
+import { getProject, updateProject, getSettings, effectiveRate, listProjectTime, listProjectInvoices, listProjectProposals, listProjectExpenses, proposalSourceUrl } from "../core/api.js";
 import { editProject } from "./projects.js";
 import { editTimeEntry, confirmDeleteEntry } from "./time-entry-modal.js";
 import { editExpense, openReceipt } from "./expenses.js";
@@ -34,6 +34,7 @@ export async function render(root, ctx) {
         <div class="faint" style="font-size:.85rem">
           <a href="#/projects">← Projects</a> ·
           <a href="#/clients/${p.client?.id}">${escapeHtml(p.client?.name || "client")}</a>
+          ${p.source_pdf_path ? ` · <a href="#" data-source>original PDF</a>` : ""}
         </div>
         <h1>${p.number ? `<span class="faint">${escapeHtml(p.number)}</span> ` : ""}${escapeHtml(p.title)}
           <span class="badge ${STATUS_TONE[p.status] || "grey"}">${STATUS_LABELS[p.status] || p.status}</span></h1>
@@ -125,6 +126,17 @@ export async function render(root, ctx) {
   } else if (tab === "proposals") {
     await renderProposalsTab(pane, p, ctx);
   }
+
+  // The bucket is private, so mint a signed URL. Open the tab first — doing it after
+  // the await would trip the popup blocker.
+  on(root, "click", "[data-source]", async (e) => {
+    e.preventDefault();
+    const w = window.open("", "_blank");
+    try {
+      const url = await proposalSourceUrl(p.source_pdf_path);
+      if (w) w.location = url; else window.location.href = url;
+    } catch (err) { w?.close(); toastErr(err.message); }
+  });
 
   on(root, "click", "[data-edit]", () => editProject({ id }, () => ctx.navigate(ctx.path)));
 }

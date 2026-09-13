@@ -825,6 +825,8 @@ export async function convertProposal(proposal, { status = "lead", start_date = 
     start_date,
     due_date,
     deliverables,
+    // The wording of an imported proposal lives in its PDF, so the PDF comes too.
+    source_pdf_path: proposal.source_pdf_path || null,
   }).select("*, client:clients(id, name)").single());
 
   await updateProposal(proposal.id, { converted_project_id: project.id });

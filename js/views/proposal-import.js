@@ -1,4 +1,10 @@
-// Import a proposal from a PDF: read it, review what was read, then create the draft.
+// Import a proposal from a PDF: read it, say how much of it you want, review that, then
+// create the draft.
+//
+// Two ways through. **Phases & fees** takes the task list and the fee schedule and
+// nothing else — the wording stays in the PDF, which is attached so it can be read as
+// it was written, and follows the proposal into its project. **The whole document**
+// also brings the prose across as editable sections.
 //
 // Nothing is written to the database until "Create draft proposal" is clicked — the
 // reader only ever fills in a form for you to check.
@@ -33,6 +39,7 @@ export async function render(root, ctx) {
   let doc = null;       // extracted text model
   let draft = null;     // what the reader produced (then edited by hand)
   let dirty = false;    // has the draft been hand-edited since it was read?
+  let mode = "all";     // 'phases' = phases and fees only | 'all' = the whole document
 
   root.innerHTML = `
     <div class="page-head">
@@ -110,10 +117,49 @@ export async function render(root, ctx) {
         "This PDF has almost no text layer — it's probably a scan, so there was " +
         "nothing to read. Fill the fields in by hand, or re-export the PDF with text.");
     }
-    reviewStep();
+    draft.phases = derivePhases(draft);
+    chooseStep();
   }
 
-  /* ---------- step 3: review ---------- */
+  /* ---------- step 3: how much of it? ---------- */
+
+  // The prose is the slow part to check and the part most often not wanted — the PDF
+  // already says it better. So this is asked before the review, and the review only
+  // shows what the answer makes relevant.
+  function chooseStep() {
+    const nSec = draft.sections.filter((x) => (x.body || "").trim()).length;
+    stage.innerHTML = `
+      <div class="cluster" style="margin-bottom:14px">
+        <span class="faint">From <strong>${escapeHtml(file.name)}</strong>
+          · ${doc.pageCount} page${doc.pageCount === 1 ? "" : "s"}</span>
+        <span style="flex:1"></span>
+        <button class="btn ghost sm" data-restart>Choose another PDF</button>
+      </div>
+
+      <div class="card">
+        <h2 class="mt-0">What should come across?</h2>
+        <div class="muted" style="margin-bottom:14px">
+          Read ${draft.phases.length} phase${draft.phases.length === 1 ? "" : "s"},
+          ${draft.line_items.length} fee line${draft.line_items.length === 1 ? "" : "s"}
+          and ${nSec} section${nSec === 1 ? "" : "s"} of prose.
+        </div>
+        <div class="choice-grid">
+          <button class="choice" data-mode="phases">
+            <strong>Phases &amp; fees only</strong>
+            <span>The task list and the fee schedule. The wording stays in the PDF,
+              which is attached to the proposal and follows it into the project, so it
+              can be read exactly as it was written.</span>
+          </button>
+          <button class="choice" data-mode="all">
+            <strong>The whole document</strong>
+            <span>Also brings the prose across as editable sections, for a proposal you
+              mean to rewrite in the builder.</span>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  /* ---------- step 4: review ---------- */
 
   const subtotal = () => draft.line_items.reduce((s, li) => s + lineAmount(li), 0);
 
@@ -181,11 +227,20 @@ export async function render(root, ctx) {
         </div>
       </div>
 
+      ${mode === "phases" ? `
+      <div class="card">
+        <div class="between"><h2 class="mt-0">Phases</h2>
+          <button class="btn subtle sm" data-add-phase>+ Add phase</button></div>
+        <div class="muted" style="margin-bottom:10px">
+          These become the Work Plan headings and the rows of the schedule chart. The
+          prose under them is not imported — it stays in the attached PDF.</div>
+        <div id="phases"></div>
+      </div>` : `
       <div class="card">
         <div class="between"><h2 class="mt-0">Sections ${chip("sections")}</h2>
           <button class="btn subtle sm" data-add-section>+ Add section</button></div>
         <div id="sections"></div>
-      </div>
+      </div>`}
 
       <div class="card">
         <div class="between"><h2 class="mt-0">Fee schedule ${chip("line_items")}</h2>
@@ -208,14 +263,18 @@ export async function render(root, ctx) {
       </div>
 
       <div class="cluster right" style="justify-content:flex-end;margin-top:8px">
-        <label class="cluster" style="gap:6px;font-size:.9rem" title="Keeps the original PDF on the proposal.">
-          <input type="checkbox" id="keep-pdf" checked /> Attach the original PDF
+        <label class="cluster" style="gap:6px;font-size:.9rem"
+               title="Keeps the original PDF on the proposal, and on the project it becomes.">
+          <input type="checkbox" id="keep-pdf" checked ${mode === "phases" ? "disabled" : ""} />
+          Attach the original PDF${mode === "phases"
+            ? ` <span class="faint">— the wording lives there</span>` : ""}
         </label>
-        <button class="btn ghost" data-template>Save as template</button>
+        ${mode === "phases" ? "" : `<button class="btn ghost" data-template>Save as template</button>`}
+        <button class="btn ghost sm" data-back>Back</button>
         <button class="btn" data-create>Create draft proposal</button>
       </div>`;
 
-    renderSections();
+    if (mode === "phases") renderPhases(); else renderSections();
     renderLines();
   }
 
@@ -233,6 +292,23 @@ export async function render(root, ctx) {
         <textarea data-k="body" rows="5" placeholder="Section text…">${escapeHtml(s.body || "")}</textarea>
       </div>`).join("")
       : `<p class="faint" style="font-size:.9rem">No sections were read from the document.</p>`;
+  }
+
+  function renderPhases() {
+    const host = stage.querySelector("#phases");
+    if (!host) return;
+    host.innerHTML = draft.phases.length
+      ? `<div class="list-rows">${draft.phases.map((name, i) => `
+          <div class="list-row" data-p="${i}">
+            <input data-phase value="${escapeHtml(name)}" placeholder="Phase name"
+                   style="flex:1;min-width:160px" />
+            <button class="icon-btn" data-move-phase="-1" title="Move up" ${i === 0 ? "disabled" : ""}>↑</button>
+            <button class="icon-btn" data-move-phase="1" title="Move down"
+                    ${i === draft.phases.length - 1 ? "disabled" : ""}>↓</button>
+            <button class="icon-btn" data-del-phase title="Remove">✕</button>
+          </div>`).join("")}</div>`
+      : `<p class="faint" style="font-size:.9rem;margin:0">No phases were read — add them,
+         or the proposal comes through as fees alone.</p>`;
   }
 
   function renderLines() {
@@ -299,6 +375,31 @@ export async function render(root, ctx) {
   });
   on(root, "click", "[data-del-line]", (e, el) => {
     draft.line_items.splice(+el.dataset.delLine, 1); dirty = true; renderLines();
+  });
+
+  on(root, "click", "[data-mode]", (e, el) => {
+    mode = el.dataset.mode;
+    reviewStep();
+  });
+  on(root, "click", "[data-back]", () => chooseStep());
+
+  on(root, "input", "[data-phase]", (e, el) => {
+    draft.phases[+el.closest("[data-p]").dataset.p] = el.value;
+    dirty = true;
+  });
+  on(root, "click", "[data-add-phase]", () => {
+    draft.phases.push(""); dirty = true; renderPhases();
+    stage.querySelector("[data-p]:last-child [data-phase]")?.focus();
+  });
+  on(root, "click", "[data-del-phase]", (e, el) => {
+    draft.phases.splice(+el.closest("[data-p]").dataset.p, 1); dirty = true; renderPhases();
+  });
+  on(root, "click", "[data-move-phase]", (e, el) => {
+    const i = +el.closest("[data-p]").dataset.p;
+    const j = i + Number(el.dataset.movePhase);
+    if (j < 0 || j >= draft.phases.length) return;
+    [draft.phases[i], draft.phases[j]] = [draft.phases[j], draft.phases[i]];
+    dirty = true; renderPhases();
   });
 
   on(root, "click", "[data-restart]", async () => {
@@ -371,7 +472,9 @@ export async function render(root, ctx) {
       }
 
       let sourcePath = null;
-      if (stage.querySelector("#keep-pdf")?.checked) {
+      // In phases mode the PDF is the document — the checkbox is locked on, and a
+      // disabled checkbox still reads as checked, so `mode` is what decides here.
+      if (mode === "phases" || stage.querySelector("#keep-pdf")?.checked) {
         try { sourcePath = await uploadProposalSource(file); }
         catch (err) { toastErr(`Proposal saved, but the PDF wasn't attached: ${err.message}`); }
       }
@@ -380,7 +483,9 @@ export async function render(root, ctx) {
         client_id: clientId,
         title,
         project_scope: draft.project_scope || "other",
-        sections: draft.sections.filter((s) => (s.heading || "").trim() || (s.body || "").trim()),
+        sections: mode === "phases"
+          ? phaseSections(draft.phases)
+          : draft.sections.filter((s) => (s.heading || "").trim() || (s.body || "").trim()),
         line_items: draft.line_items.filter((li) => (li.description || "").trim()),
         subtotal: Math.round(subtotal() * 100) / 100,
         status: "draft",
@@ -420,3 +525,36 @@ function tokenise(text, clientName, settings) {
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/* The task list, as the document gives it: the "Task 1 …" headings if the reader found
+   them, otherwise the fee schedule's own descriptions, which name the same work. */
+function derivePhases(draft) {
+  const TASKISH = /^(task|phase|stage)\s*\d/i;
+  const fromHeadings = (draft.sections || [])
+    .map((s) => (s.heading || "").replace(/\s+/g, " ").trim())
+    .filter((h) => TASKISH.test(h));
+  if (fromHeadings.length) return dedupe(fromHeadings);
+  return dedupe((draft.line_items || [])
+    .map((li) => (li.description || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean));
+}
+
+const dedupe = (xs) => [...new Set(xs)];
+
+/* Phases and fees, and nothing else: a Work Plan heading per phase, a schedule chart
+   with a row for each, and the fee table. No prose — that is what the PDF is for. The
+   schedule rows are left undated on purpose, so the chart prints its red "set the
+   dates" placeholder rather than inventing a programme nobody agreed to. */
+function phaseSections(phases = []) {
+  const names = phases.map((p) => String(p || "").trim()).filter(Boolean);
+  return [
+    { part: "workplan", level: 1, heading: "Work Plan", body: "" },
+    ...names.map((name) => ({ part: "workplan", level: 2, heading: name, body: "" })),
+    { part: "schedule", level: 1, heading: "Project Schedule", body: "" },
+    { part: "schedule", kind: "schedule", scale: "week",
+      rows: names.map((task) => ({ task, start: "", due: "" })) },
+    { part: "fees", level: 1, heading: "Design Fees", body: "" },
+    { part: "fees", level: 3, heading: "A. Base Scope", body: "" },
+    { part: "fees", kind: "fees" },
+  ];
+}

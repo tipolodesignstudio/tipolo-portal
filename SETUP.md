@@ -44,6 +44,7 @@ That one file bundles every migration:
 | `0019_day_rate.sql` | Day rate on Settings (defaults to hourly x 8) |
 | `0020_invoice_document.sql` | The invoice as a document: progress lines, editable sections, `YYNNN-XXX` numbering |
 | `0021_tiers_and_numbering.sql` | Staff rate tiers, hours per day, and the January reset (`YY001` internal, client work from `YY101`) |
+| `0022_project_source_pdf.sql` | An imported proposal's PDF follows it into its project |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
