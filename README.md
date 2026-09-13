@@ -79,6 +79,25 @@ dev/                       local parser check (not used by the app)
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
 
+## Settings
+
+Five tabs: **Business** (identity, logo, signature), **Rates**, **Taxes**, **Numbering**,
+**Categories**. The tabbed panels share one Save button; the managed lists — staff tiers,
+client categories, expense categories — are rows that save as you edit them.
+
+**Rates.** One row per staff tier, each with its own hourly rate. The tier marked
+*default* is what a proposal quotes and what a project falls back to when neither it nor
+the client sets a rate; the whole list prints as the proposal's rate card
+(`{{rate.list}}`). A day is a number of hours — 8 unless changed — so the day rate is
+always the hourly rate times that, and there is no second figure to keep in step.
+
+**Numbering.** The sequence year follows the calendar; it is shown, not typed. On the
+first job number drawn in a new year the count restarts at the client-work floor
+(`101` by default), and `YY001` is created as that year's internal project — the one you
+log studio time against, owned by the studio's own client, which is kept out of the
+Clients list. `ensure_internal_project()` is idempotent and runs on sign-in, so the
+January rollover needs no scheduler. Numbers below the floor stay with the studio.
+
 ## The proposal builder
 
 Opening a proposal gives you a two-pane workspace: the form on the left, the page the

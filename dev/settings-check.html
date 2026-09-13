@@ -1,0 +1,90 @@
+<!doctype html>
+<meta charset="utf-8"><title>settings check</title>
+<!--
+  Mounts the Settings view against stubbed PostgREST responses, so the tabs, the staff
+  tiers and the managed lists can be exercised without the live database.
+  Open it at http://localhost:4173/dev/settings-check.html
+  Nothing here ships with the app.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/document.css">
+<style>body{margin:0;background:var(--bg,#F5F2E9)} #app{max-width:900px;margin:0 auto;padding:24px}
+  #err{position:fixed;bottom:0;left:0;right:0;z-index:99;background:#F5E3DC;color:#B3341C;
+       font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;padding:8px}</style>
+<div id="app"></div>
+<div id="err" hidden></div>
+<script type="module">
+  const err = document.getElementById("err");
+  const fail = (m) => { err.hidden = false; err.textContent += m + "\n"; };
+  window.addEventListener("error", (e) => fail(e.message));
+  window.addEventListener("unhandledrejection", (e) => fail(String(e.reason)));
+
+  const db = {
+    app_settings: {
+      id: 1, business_name: "Tipolo Design Studio", email: "accounts@tipolo.ca",
+      phone: "604.729.0597", currency: "CAD", address: "Port Moody, BC",
+      gst_number: "", pst_number: "", logo_url: "", signature_url: "",
+      tax_lines: [{ label: "GST", rate: 5, enabled: true }, { label: "PST", rate: 7, enabled: true }],
+      hours_per_day: 8,
+      job_seq_year: 2025,          // stale on purpose: the page should show 2026 and roll
+      job_seq_next: 3,
+      job_seq_start: 101,
+    },
+    staff_tiers: [
+      { id: "t1", name: "Principal Designer", hourly_rate: 85, is_default: true, sort_order: 0 },
+      { id: "t2", name: "Designer", hourly_rate: 65, is_default: false, sort_order: 1 },
+    ],
+    client_categories: [{ id: "c1", name: "Landscape Architecture", sort_order: 0 }],
+    expense_categories: [{ id: "e1", name: "Software", sort_order: 0 }],
+  };
+  window.__db = db;
+
+  const table = (url) => (url.match(/\/rest\/v1\/([a-z_]+)/) || [])[1];
+  const real = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    if (!url.includes("/rest/v1/")) return real(input, init);
+    const t = table(url);
+    const method = (init?.method || "GET").toUpperCase();
+    const body = init?.body ? JSON.parse(init.body) : null;
+    const json = (b) => new Response(JSON.stringify(b),
+      { status: 200, headers: { "content-type": "application/json" } });
+    console.log("[stub]", method, t, body || "");
+
+    if (t === "app_settings") {
+      if (method !== "GET") Object.assign(db.app_settings, body);
+      return json(db.app_settings);
+    }
+    const rows = db[t];
+    if (!rows) return json([]);
+    if (method === "GET") return json(rows);
+    if (method === "POST") {
+      const row = { id: "n" + Math.random().toString(36).slice(2, 6), ...body };
+      rows.push(row);
+      return json(row);
+    }
+    if (method === "PATCH") {
+      const m = url.match(/id=eq\.([^&]+)/);
+      if (m) {
+        const row = rows.find((r) => r.id === m[1]);
+        Object.assign(row, body);
+        return json(row);
+      }
+      rows.forEach((r) => { if (r.is_default) Object.assign(r, body); });   // clear-default sweep
+      return json(rows[0]);
+    }
+    if (method === "DELETE") {
+      const m = url.match(/id=eq\.([^&]+)/);
+      const i = rows.findIndex((r) => r.id === m?.[1]);
+      if (i >= 0) rows.splice(i, 1);
+      return json([]);
+    }
+    return json([]);
+  };
+
+  const { render } = await import("../js/views/settings.js");
+  await render(document.getElementById("app"), { setCrumbs() {} });
+</script>

@@ -2,7 +2,7 @@
 import { supabase, CONFIG_OK } from "./core/supabase.js";
 import { defineRoutes, startRouter } from "./core/router.js";
 import { renderShell } from "./components/layout.js";
-import { getSettings } from "./core/api.js";
+import { getSettings, ensureInternalProject } from "./core/api.js";
 import { setCurrency } from "./core/format.js";
 import * as loginView from "./views/login.js";
 
@@ -70,6 +70,10 @@ async function showApp(session) {
     const s = await getSettings();
     if (s?.currency) setCurrency(s.currency);
   } catch { /* ignore */ }
+
+  // The year's internal project, YY001. The call is a no-op once it exists, so signing
+  // in is what carries the numbering over the New Year — no scheduler to run or miss.
+  ensureInternalProject().catch(() => { /* pre-0021 database, or offline */ });
 }
 
 async function boot() {

@@ -26,17 +26,77 @@ function unwrap({ data, error }) {
 /* ---------------- settings ---------------- */
 
 export async function getSettings() {
-  const { data, error } = await supabase
-    .from("app_settings").select("*").eq("id", 1).maybeSingle();
+  const [row, tiers] = await Promise.all([
+    supabase.from("app_settings").select("*").eq("id", 1).maybeSingle(),
+    supabase.from("staff_tiers").select("*").order("sort_order").order("name"),
+  ]);
+  if (row.error) throw new Error(row.error.message);
+  return withRates(row.data || defaultSettings(), tiers.error ? [] : (tiers.data || []));
+}
+
+/* The rate a proposal quotes, and the one a project falls back to, is the default
+   tier's — but everything downstream still asks for `default_hourly_rate`, and a day is
+   simply that many hours. Both are attached here so the rest of the app never has to
+   know the rate moved onto its own table. */
+export function withRates(settings, tiers = []) {
+  const def = tiers.find((t) => t.is_default) || tiers[0] || null;
+  const hourly = def && def.hourly_rate != null ? Number(def.hourly_rate) : null;
+  const hours = Number(settings.hours_per_day) || 8;
+  return {
+    ...settings,
+    staff_tiers: tiers,
+    hours_per_day: hours,
+    default_hourly_rate: hourly,
+    default_day_rate: hourly == null ? null : round2(hourly * hours),
+  };
+}
+
+/* ---------------- staff rate tiers ---------------- */
+
+export async function listStaffTiers() {
+  return unwrap(await supabase.from("staff_tiers").select("*").order("sort_order").order("name"));
+}
+export async function createStaffTier(name, hourly_rate = null) {
+  const rows = await listStaffTiers();
+  return unwrap(await supabase.from("staff_tiers").insert({
+    name: name.trim(),
+    hourly_rate,
+    sort_order: rows.length,
+    is_default: !rows.length,      // the first tier added is the default
+  }).select().single());
+}
+export async function updateStaffTier(id, patch) {
+  return unwrap(await supabase.from("staff_tiers").update(patch).eq("id", id).select().single());
+}
+// One tier at a time is the default — a partial unique index enforces it, so the old
+// one has to be cleared before the new one is set.
+export async function setDefaultStaffTier(id) {
+  const { error } = await supabase.from("staff_tiers")
+    .update({ is_default: false }).eq("is_default", true).neq("id", id);
   if (error) throw new Error(error.message);
-  return data || defaultSettings();
+  return updateStaffTier(id, { is_default: true });
+}
+export async function deleteStaffTier(id) {
+  const { error } = await supabase.from("staff_tiers").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+  // Never leave the list without a default.
+  const rows = await listStaffTiers();
+  if (rows.length && !rows.some((t) => t.is_default)) await setDefaultStaffTier(rows[0].id);
+}
+
+// The year's internal project (YY001). Idempotent, so it can run on every sign-in;
+// that is what makes the January rollover happen without a scheduler.
+export async function ensureInternalProject() {
+  const { data, error } = await supabase.rpc("ensure_internal_project");
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function saveSettings(patch) {
   const write = (body) => supabase.from("app_settings").update(body).eq("id", 1).select().single();
   const res = await write(patch);
-  // A column the database has not got yet (0017 not run) shouldn't take the whole
-  // Settings page down — drop it and save the rest, then say so.
+  // A column the database has not got yet (a migration not run) shouldn't take the
+  // whole Settings page down — drop it and save the rest, then say so.
   if (res.error && /column .* does not exist|Could not find the '.*' column/i.test(res.error.message)) {
     const missing = /'([^']+)'|column "?([\w.]+)"?/.exec(res.error.message);
     const col = (missing?.[1] || missing?.[2] || "").split(".").pop();
@@ -45,7 +105,7 @@ export async function saveSettings(patch) {
       const retry = await write(rest);
       if (!retry.error) {
         throw Object.assign(
-          new Error(`Saved, but "${col}" needs migration 0017 run in Supabase first.`),
+          new Error(`Saved, but "${col}" needs the latest migration run in Supabase first.`),
           { partial: true, settings: retry.data });
       }
     }
@@ -63,7 +123,8 @@ function defaultSettings() {
     ],
     business_name: "", address: "", email: "", phone: "",
     gst_number: "", pst_number: "", logo_url: "",
-    default_hourly_rate: null, payment_terms: "", proposal_terms: "",
+    hours_per_day: 8, job_seq_start: 101,
+    payment_terms: "", proposal_terms: "",
   };
 }
 
@@ -107,7 +168,9 @@ const CLIENT_SELECT =
   "contacts:client_contacts(id, name, title, email, phone, is_primary)";
 
 export async function listClients({ search = "", status = "active", categoryId = "" } = {}) {
-  let q = supabase.from("clients").select(CLIENT_SELECT).order("name", { ascending: true });
+  // The studio's own client carries the internal project; it is not someone you bill.
+  let q = supabase.from("clients").select(CLIENT_SELECT)
+    .eq("is_internal", false).order("name", { ascending: true });
   if (status && status !== "all") q = q.eq("status", status);
   if (categoryId) q = q.eq("category_id", categoryId);
   if (search.trim()) {
@@ -247,7 +310,8 @@ export function effectiveRate(project, settings) {
 
 export async function getDashboardStats() {
   const [clientsActive, projects] = await Promise.all([
-    supabase.from("clients").select("id", { count: "exact", head: true }).eq("status", "active"),
+    supabase.from("clients").select("id", { count: "exact", head: true })
+      .eq("status", "active").eq("is_internal", false),
     supabase.from("projects").select("id, status, title, updated_at, client:clients(name)")
       .order("updated_at", { ascending: false }),
   ]);

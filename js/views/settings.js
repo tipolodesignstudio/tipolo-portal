@@ -1,13 +1,28 @@
-// Settings: business identity, tax lines, numbering, client categories, terms, logo.
-import { escapeHtml, setCurrency } from "../core/format.js";
+// Settings — business identity, rates, taxes, numbering and the managed lists.
+//
+// Five tabs rather than one long scroll. The tabbed panels are all inside one form and
+// share the Save button; the managed lists (staff tiers, client and expense categories)
+// are rows in their own tables, so they save as you edit them and need no Save.
+
+import { escapeHtml, money, setCurrency } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
   getSettings, saveSettings, uploadLogo, uploadSignature,
+  listStaffTiers, createStaffTier, updateStaffTier, deleteStaffTier, setDefaultStaffTier,
   listCategories, createCategory, updateCategory, deleteCategory,
   listExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
 } from "../core/api.js";
 import { confirmModal } from "../components/modal.js";
 import { toastOk, toastErr } from "../components/toast.js";
+
+const TABS = [
+  { id: "business", label: "Business" },
+  { id: "rates", label: "Rates" },
+  { id: "taxes", label: "Taxes" },
+  { id: "numbering", label: "Numbering" },
+  { id: "categories", label: "Categories" },
+];
+const TAB_KEY = "tipolo.settings.tab";
 
 let taxLines = [];
 
@@ -23,141 +38,271 @@ export async function render(root, ctx) {
     ? s.tax_lines.map((t) => ({ ...t }))
     : [{ label: "GST", rate: 5, enabled: true }, { label: "PST", rate: 7, enabled: true }];
 
+  /* Numbering is no longer typed in. The year follows the calendar, and the next number
+     is whatever next_job_number() would hand out right now — worked out the same way
+     here so the page cannot promise a number the database won't give. */
+  const year = new Date().getFullYear();
+  const yy = String(year).slice(2);
+  const start = Number(s.job_seq_start) || 101;
+  const rolled = Number(s.job_seq_year) !== year;
+  const nextSeq = rolled ? start : Math.max(Number(s.job_seq_next) || start, start);
+
+  let tab = localStorage.getItem(TAB_KEY);
+  if (!TABS.some((t) => t.id === tab)) tab = TABS[0].id;
+
   root.innerHTML = `
     <div class="page-head">
       <div><h1>Settings</h1>
         <div class="muted">These details appear on your invoices and proposals.</div></div>
     </div>
 
+    <div class="part-nav" id="settings-tabs">
+      ${TABS.map((t) => `<button type="button" data-tab="${t.id}"
+        class="${t.id === tab ? "active" : ""}">${escapeHtml(t.label)}</button>`).join("")}
+    </div>
+
     <form id="settings-form" class="stack">
-      <div class="card">
-        <h2>Business identity</h2>
-        <div class="form-grid cols-2">
-          ${text("business_name", "Business name", s.business_name, "Tipolo Design Studio")}
-          ${text("email", "Billing email", s.email, "accounts@tipolo.ca")}
-          ${text("phone", "Phone", s.phone)}
-          ${text("currency", "Currency code", s.currency || "CAD")}
-        </div>
-        <div class="form-grid" style="margin-top:14px">
-          ${textarea("address", "Address", s.address, 2)}
-        </div>
-        <div class="form-grid cols-2" style="margin-top:14px">
-          ${text("gst_number", "GST number", s.gst_number)}
-          ${text("pst_number", "PST number", s.pst_number)}
-        </div>
-      </div>
 
-      <div class="card">
-        <h2>Logo</h2>
-        <div class="cluster">
-          <div id="logo-preview" style="width:120px;height:60px;border:1px solid var(--border);
-               border-radius:8px;display:grid;place-items:center;background:var(--bg);overflow:hidden">
-            ${s.logo_url ? `<img src="${escapeHtml(s.logo_url)}" style="max-width:100%;max-height:100%">`
-                         : `<span class="faint" style="font-size:.8rem">No logo</span>`}
+      <div data-panel="business" class="stack">
+        <div class="card">
+          <h2>Business identity</h2>
+          <div class="form-grid cols-2">
+            ${text("business_name", "Business name", s.business_name, "Tipolo Design Studio")}
+            ${text("email", "Billing email", s.email, "accounts@tipolo.ca")}
+            ${text("phone", "Phone", s.phone)}
+            ${text("currency", "Currency code", s.currency || "CAD")}
           </div>
-          <label class="btn subtle sm">
-            Upload image<input type="file" id="logo-file" accept="image/*" hidden />
-          </label>
-          <input type="hidden" name="logo_url" value="${escapeHtml(s.logo_url || "")}" />
-          ${s.logo_url ? `<button type="button" class="btn link" id="logo-clear">Remove</button>` : ""}
-        </div>
-        <div class="hint">Requires a public Storage bucket named <code>branding</code> (see SETUP.md).</div>
-      </div>
-
-      <div class="card">
-        <h2>Signature</h2>
-        <div class="muted" style="margin-bottom:10px">
-          Printed on a proposal's cover letter, between “Sincerely,” and your name.
-          A PNG with a transparent background works best.
-        </div>
-        <div class="cluster">
-          <div id="sig-preview" style="width:190px;height:70px;border:1px solid var(--border);
-               border-radius:8px;display:grid;place-items:center;background:var(--bg);overflow:hidden">
-            ${s.signature_url ? `<img src="${escapeHtml(s.signature_url)}" style="max-width:100%;max-height:100%">`
-                              : `<span class="faint" style="font-size:.8rem">No signature</span>`}
+          <div class="form-grid" style="margin-top:14px">
+            ${textarea("address", "Address", s.address, 2)}
           </div>
-          <label class="btn subtle sm">
-            Upload image<input type="file" id="sig-file" accept="image/*" hidden />
-          </label>
-          <input type="hidden" name="signature_url" value="${escapeHtml(s.signature_url || "")}" />
-          ${s.signature_url ? `<button type="button" class="btn link" id="sig-clear">Remove</button>` : ""}
+          <div class="form-grid cols-2" style="margin-top:14px">
+            ${text("gst_number", "GST number", s.gst_number)}
+            ${text("pst_number", "PST number", s.pst_number)}
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Logo</h2>
+          <div class="cluster">
+            <div id="logo-preview" style="width:120px;height:60px;border:1px solid var(--border);
+                 border-radius:8px;display:grid;place-items:center;background:var(--bg);overflow:hidden">
+              ${s.logo_url ? `<img src="${escapeHtml(s.logo_url)}" style="max-width:100%;max-height:100%">`
+                           : `<span class="faint" style="font-size:.8rem">No logo</span>`}
+            </div>
+            <label class="btn subtle sm">
+              Upload image<input type="file" id="logo-file" accept="image/*" hidden />
+            </label>
+            <input type="hidden" name="logo_url" value="${escapeHtml(s.logo_url || "")}" />
+            ${s.logo_url ? `<button type="button" class="btn link" id="logo-clear">Remove</button>` : ""}
+          </div>
+          <div class="hint">Requires a public Storage bucket named <code>branding</code> (see SETUP.md).</div>
+        </div>
+
+        <div class="card">
+          <h2>Signature</h2>
+          <div class="muted" style="margin-bottom:10px">
+            Printed on a proposal's cover letter, between “Sincerely,” and your name.
+            A PNG with a transparent background works best.
+          </div>
+          <div class="cluster">
+            <div id="sig-preview" style="width:190px;height:70px;border:1px solid var(--border);
+                 border-radius:8px;display:grid;place-items:center;background:var(--bg);overflow:hidden">
+              ${s.signature_url ? `<img src="${escapeHtml(s.signature_url)}" style="max-width:100%;max-height:100%">`
+                                : `<span class="faint" style="font-size:.8rem">No signature</span>`}
+            </div>
+            <label class="btn subtle sm">
+              Upload image<input type="file" id="sig-file" accept="image/*" hidden />
+            </label>
+            <input type="hidden" name="signature_url" value="${escapeHtml(s.signature_url || "")}" />
+            ${s.signature_url ? `<button type="button" class="btn link" id="sig-clear">Remove</button>` : ""}
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>Tax lines</h2>
-        <div class="muted" style="margin-bottom:10px">Applied to invoice subtotals in order.</div>
-        <div id="tax-rows" class="stack" style="gap:8px"></div>
-        <button type="button" class="btn ghost sm" id="tax-add" style="margin-top:10px">+ Add tax line</button>
-      </div>
-
-      <div class="card">
-        <h2>Numbering</h2>
-        <div class="muted" style="margin-bottom:10px">
-          Jobs are numbered <code>YYNNN</code> (e.g. <code>${String(new Date().getFullYear()).slice(2)}001</code>) —
-          a proposal or project draws the next number, and a converted proposal keeps its
-          number as the project number. The sequence resets each January.
-          Invoices are <code>YYNNN-XX</code> — the project number plus a per-project
-          count starting at <code>01</code>.
+      <div data-panel="rates" class="stack">
+        <div class="card">
+          <h2>Staff rates</h2>
+          <div class="muted" style="margin-bottom:10px">
+            One row per tier. The tier marked <strong>default</strong> is the rate a
+            proposal quotes and the one a project falls back to when neither it nor the
+            client sets its own. The whole list prints as the proposal's rate card.
+          </div>
+          <div id="tier-list"></div>
+          <div class="cluster" style="margin-top:10px">
+            <input type="text" id="tier-new" placeholder="New tier, e.g. Junior Designer"
+                   style="max-width:260px" />
+            <button type="button" class="btn subtle sm" id="tier-add">Add tier</button>
+          </div>
         </div>
-        <div class="form-grid cols-2">
-          ${number("default_hourly_rate", "Default hourly rate", s.default_hourly_rate, "0.01")}
-          ${number("default_day_rate", "Day rate", s.default_day_rate, "0.01")}
-          ${number("job_seq_year", "Sequence year", s.job_seq_year ?? new Date().getFullYear(), "1")}
-          ${number("job_seq_next", "Next job number", s.job_seq_next ?? 1, "1")}
-        </div>
-        <div class="hint">Leave the day rate blank and a proposal works it out as the hourly
-          rate &times; 8. Adjust "Next job number" only to line the portal up with numbers
-          you've already issued elsewhere.</div>
-      </div>
 
-      <div class="card">
-        <h2>Client categories</h2>
-        <div class="muted" style="margin-bottom:10px">Assignable on each client and filterable on the Clients list.</div>
-        <div id="cat-list" class="stack" style="gap:8px"></div>
-        <form class="cluster" id="cat-add" style="margin-top:10px">
-          <input type="text" name="name" placeholder="New category…" style="max-width:220px" />
-          <button class="btn subtle sm" type="submit">Add category</button>
-        </form>
-      </div>
-
-      <div class="card">
-        <h2>Expense categories</h2>
-        <div class="muted" style="margin-bottom:10px">Used when logging an expense.</div>
-        <div id="exp-cat-list" class="stack" style="gap:8px"></div>
-        <form class="cluster" id="exp-cat-add" style="margin-top:10px">
-          <input type="text" name="name" placeholder="New category…" style="max-width:220px" />
-          <button class="btn subtle sm" type="submit">Add category</button>
-        </form>
-      </div>
-
-      <div class="card">
-        <h2>Boilerplate</h2>
-        <div class="form-grid">
-          ${textarea("payment_terms", "Invoice payment terms", s.payment_terms, 3)}
-          ${textarea("proposal_terms", "Proposal default terms", s.proposal_terms, 3)}
+        <div class="card">
+          <h2>Length of a day</h2>
+          <div class="form-grid cols-2">
+            ${number("hours_per_day", "Hours in a working day", s.hours_per_day ?? 8, "0.25")}
+          </div>
+          <div class="hint">A day rate is the hourly rate times this — there is no second
+            figure to keep in step. <span id="day-example"></span></div>
         </div>
       </div>
 
-      <div class="cluster">
+      <div data-panel="taxes" class="stack">
+        <div class="card">
+          <h2>Tax lines</h2>
+          <div class="muted" style="margin-bottom:10px">Applied to invoice subtotals in order.</div>
+          <div id="tax-rows" class="stack" style="gap:8px"></div>
+          <button type="button" class="btn ghost sm" id="tax-add" style="margin-top:10px">+ Add tax line</button>
+        </div>
+      </div>
+
+      <div data-panel="numbering" class="stack">
+        <div class="card">
+          <h2>Job numbers</h2>
+          <div class="muted" style="margin-bottom:10px">
+            Jobs are numbered <code>YYNNN</code> — a proposal or project draws the next
+            one, and a converted proposal keeps its number as the project number.
+            Invoices are <code>YYNNN-XXX</code>: the project number plus a per-project
+            count from <code>001</code>.
+          </div>
+          <div class="form-grid cols-2">
+            <div class="field">
+              <label class="lbl">Sequence year</label>
+              <span class="ro-box">${year}</span>
+            </div>
+            <div class="field">
+              <label class="lbl">Next job number</label>
+              <span class="ro-box"><code>${yy}${String(nextSeq).padStart(3, "0")}</code></span>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:8px">
+            The year follows the calendar on its own${rolled
+              ? ` — the counter still reads ${escapeHtml(String(s.job_seq_year))} and rolls over on the next number drawn`
+              : ""}.
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>The January reset</h2>
+          <div class="muted" style="margin-bottom:10px">
+            On the first job number of a new year the count restarts, and
+            <code>${yy}001</code> is created as that year's internal project — the one
+            you log studio time against. Client work begins at the number below, so the
+            range beneath it stays with the studio.
+          </div>
+          <div class="form-grid cols-2">
+            ${number("job_seq_start", "Client work starts at", start, "1")}
+            ${number("job_seq_next", "Override the next number", nextSeq, "1")}
+          </div>
+          <div class="hint">Change the override only to line the portal up with numbers
+            you have already issued elsewhere; it is stamped with this year.</div>
+        </div>
+      </div>
+
+      <div data-panel="categories" class="stack">
+        <div class="card">
+          <h2>Client categories</h2>
+          <div class="muted" style="margin-bottom:10px">
+            Assignable on each client and filterable on the Clients list.</div>
+          <div id="cat-list"></div>
+          <div class="cluster" style="margin-top:10px">
+            <input type="text" id="cat-new" placeholder="New category…" style="max-width:240px" />
+            <button type="button" class="btn subtle sm" id="cat-add">Add</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Expense categories</h2>
+          <div class="muted" style="margin-bottom:10px">Used when logging an expense.</div>
+          <div id="ecat-list"></div>
+          <div class="cluster" style="margin-top:10px">
+            <input type="text" id="ecat-new" placeholder="New category…" style="max-width:240px" />
+            <button type="button" class="btn subtle sm" id="ecat-add">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cluster" id="save-bar">
         <button type="submit" class="btn">Save settings</button>
         <span id="save-state" class="faint"></span>
       </div>
     </form>`;
 
-  renderTaxRows(root);
-  wireCategories(root, {
-    listEl: "#cat-list", addEl: "#cat-add", attr: "cat",
+  const form = root.querySelector("#settings-form");
+
+  /* ---- tabs ---- */
+  function showTab(id) {
+    tab = id;
+    localStorage.setItem(TAB_KEY, id);
+    root.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === id));
+    root.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== id; });
+    // The lists save themselves, so the Save button has nothing to do on that tab.
+    root.querySelector("#save-bar").hidden = id === "categories";
+  }
+  on(root, "click", "[data-tab]", (e, btn) => showTab(btn.dataset.tab));
+  showTab(tab);
+
+  /* ---- staff tiers ---- */
+  const tiers = editableList(root, {
+    listEl: "#tier-list", newEl: "#tier-new", addEl: "#tier-add", attr: "tier",
+    placeholder: "No tiers yet — the proposal's rate card will print a placeholder.",
+    list: listStaffTiers,
+    create: (name) => createStaffTier(name),
+    update: updateStaffTier,
+    del: deleteStaffTier,
+    delMsg: "Delete this tier? Proposals already written keep the rate they printed.",
+    columns: (t) => `
+      <input data-tier-field="name" value="${escapeHtml(t.name || "")}"
+             placeholder="Tier name" style="flex:1;min-width:140px" />
+      <span class="faint">$</span>
+      <input data-tier-field="hourly_rate" type="number" step="0.01" min="0"
+             value="${t.hourly_rate ?? ""}" placeholder="rate" style="max-width:100px;text-align:right" />
+      <span class="faint" style="font-size:.8rem">/hour</span>
+      <label style="display:flex;gap:6px;align-items:center;font-size:.85rem">
+        <input type="radio" name="tier-default" data-tier-default ${t.is_default ? "checked" : ""}
+               style="width:auto" /> default
+      </label>`,
+    onChange: refreshDayExample,
+  });
+
+  on(root, "change", "[data-tier-default]", async (e, el) => {
+    const id = el.closest("[data-tier]").dataset.tier;
+    try { await setDefaultStaffTier(id); toastOk("Default rate set"); tiers.refresh(); }
+    catch (err) { toastErr(err.message); }
+  });
+
+  /* ---- categories ---- */
+  editableList(root, {
+    listEl: "#cat-list", newEl: "#cat-new", addEl: "#cat-add", attr: "cat",
+    placeholder: "No categories.",
     list: listCategories, create: createCategory, update: updateCategory, del: deleteCategory,
     delMsg: "Delete this category? It's removed from any clients that have it.",
+    columns: (c) => `<input data-cat-field="name" value="${escapeHtml(c.name || "")}"
+      placeholder="Category name" style="flex:1;min-width:160px" />`,
   });
-  wireCategories(root, {
-    listEl: "#exp-cat-list", addEl: "#exp-cat-add", attr: "ecat",
+  editableList(root, {
+    listEl: "#ecat-list", newEl: "#ecat-new", addEl: "#ecat-add", attr: "ecat",
+    placeholder: "No categories.",
     list: listExpenseCategories, create: createExpenseCategory,
     update: updateExpenseCategory, del: deleteExpenseCategory,
     delMsg: "Delete this category? It's removed from any expenses that have it.",
+    columns: (c) => `<input data-ecat-field="name" value="${escapeHtml(c.name || "")}"
+      placeholder="Category name" style="flex:1;min-width:160px" />`,
   });
 
+  /* ---- the worked example under "length of a day" ---- */
+  function refreshDayExample() {
+    const el = root.querySelector("#day-example");
+    if (!el) return;
+    const hours = Number(root.querySelector("[name=hours_per_day]")?.value) || 0;
+    const def = (tiers.rows() || []).find((t) => t.is_default) || (tiers.rows() || [])[0];
+    const rate = def && def.hourly_rate != null ? Number(def.hourly_rate) : null;
+    el.textContent = rate && hours
+      ? `At ${money(rate)}/hour that is ${money(rate * hours)} a day.`
+      : "";
+  }
+  on(root, "input", "[name=hours_per_day]", refreshDayExample);
+
+  /* ---- tax lines ---- */
+  renderTaxRows(root);
   on(root, "click", "#tax-add", () => {
     taxLines.push({ label: "", rate: 0, enabled: true });
     renderTaxRows(root);
@@ -172,6 +317,7 @@ export async function render(root, ctx) {
     taxLines[i][f] = f === "rate" ? Number(node.value) : f === "enabled" ? node.checked : node.value;
   });
 
+  /* ---- images ---- */
   const fileInput = root.querySelector("#logo-file");
   fileInput?.addEventListener("change", async () => {
     const file = fileInput.files[0];
@@ -208,11 +354,13 @@ export async function render(root, ctx) {
       `<span class="faint" style="font-size:.8rem">No signature</span>`;
   });
 
-  root.querySelector("#settings-form").addEventListener("submit", async (e) => {
+  /* ---- save ---- */
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector("button[type=submit]");
     const stateEl = root.querySelector("#save-state");
     const fd = new FormData(e.target);
+    const seqStart = Math.max(1, Number(fd.get("job_seq_start")) || 101);
     const patch = {
       business_name: fd.get("business_name") || null,
       email: fd.get("email") || null,
@@ -223,13 +371,12 @@ export async function render(root, ctx) {
       pst_number: fd.get("pst_number") || null,
       logo_url: fd.get("logo_url") || null,
       signature_url: fd.get("signature_url") || null,
-      default_hourly_rate: fd.get("default_hourly_rate") ? Number(fd.get("default_hourly_rate")) : null,
-      // Left blank the proposal works it out as the hourly rate x 8.
-      default_day_rate: fd.get("default_day_rate") ? Number(fd.get("default_day_rate")) : null,
-      job_seq_year: Math.max(2000, Number(fd.get("job_seq_year")) || new Date().getFullYear()),
-      job_seq_next: Math.max(1, Number(fd.get("job_seq_next")) || 1),
-      payment_terms: fd.get("payment_terms") || null,
-      proposal_terms: fd.get("proposal_terms") || null,
+      hours_per_day: Math.max(0.25, Number(fd.get("hours_per_day")) || 8),
+      job_seq_start: seqStart,
+      // The override is stamped with this year, which is what makes the year automatic:
+      // saying "next is N" can only mean this year's N.
+      job_seq_year: year,
+      job_seq_next: Math.max(seqStart, Number(fd.get("job_seq_next")) || seqStart),
       tax_lines: taxLines
         .filter((t) => t.label.trim())
         .map((t) => ({ label: t.label.trim(), rate: Number(t.rate) || 0, enabled: !!t.enabled })),
@@ -248,47 +395,75 @@ export async function render(root, ctx) {
   });
 }
 
-async function wireCategories(root, cfg) {
+/* A managed list that saves as you edit it: type in a cell, and the row is written when
+   you leave it or press Enter. No Rename button, no Save — the same feel as editing a
+   spreadsheet, which is what these lists are. */
+function editableList(root, cfg) {
   const host = root.querySelector(cfg.listEl);
-  if (!host) return;
   const a = cfg.attr;
+  let rows = [];
 
   async function refresh() {
-    let cats = [];
-    try { cats = await cfg.list(); }
+    try { rows = await cfg.list(); }
     catch (err) { host.innerHTML = `<div class="alert error">${escapeHtml(err.message)}</div>`; return; }
-    host.innerHTML = cats.length ? cats.map((c) => `
-      <div class="cluster" data-${a}="${c.id}" style="gap:8px">
-        <input value="${escapeHtml(c.name)}" data-${a}-name style="max-width:220px" />
-        <button type="button" class="btn ghost sm" data-${a}-save>Rename</button>
-        <button type="button" class="btn link" data-${a}-del>delete</button>
-      </div>`).join("")
-      : `<p class="faint" style="font-size:.9rem">No categories.</p>`;
+    host.innerHTML = rows.length
+      ? `<div class="list-rows">${rows.map((r) => `
+          <div class="list-row" data-${a}="${r.id}">
+            ${cfg.columns(r)}
+            <button type="button" class="icon-btn" data-${a}-del title="Delete">✕</button>
+          </div>`).join("")}</div>`
+      : `<p class="faint" style="font-size:.9rem;margin:0">${escapeHtml(cfg.placeholder)}</p>`;
+    cfg.onChange?.();
   }
 
-  on(root, "click", `[data-${a}-save]`, async (e, btn) => {
-    const wrap = btn.closest(`[data-${a}]`);
-    const name = wrap.querySelector(`[data-${a}-name]`).value.trim();
-    if (!name) return;
-    try { await cfg.update(wrap.dataset[a], { name }); toastOk("Renamed"); refresh(); }
-    catch (err) { toastErr(err.message); }
+  // Written on blur, and on Enter so the keyboard alone is enough.
+  const commit = async (el) => {
+    const wrap = el.closest(`[data-${a}]`);
+    if (!wrap) return;
+    const field = el.dataset[`${a}Field`];
+    const row = rows.find((r) => r.id === wrap.dataset[a]);
+    let value = el.value.trim();
+    if (field === "name") {
+      if (!value) { el.value = row?.name || ""; return; }
+    } else {
+      value = value === "" ? null : Number(value);
+    }
+    if (row && String(row[field] ?? "") === String(value ?? "")) return;   // untouched
+    try {
+      const saved = await cfg.update(wrap.dataset[a], { [field]: value });
+      Object.assign(row || {}, saved);
+      cfg.onChange?.();
+    } catch (err) { toastErr(err.message); refresh(); }
+  };
+
+  // focusout, not blur: blur does not bubble, so it never reaches a delegated handler.
+  on(root, "focusout", `[data-${a}-field]`, (e, el) => commit(el));
+  on(root, "keydown", `[data-${a}-field]`, (e, el) => {
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+    if (e.key === "Escape") { refresh(); }
   });
+
   on(root, "click", `[data-${a}-del]`, async (e, btn) => {
-    const ok = await confirmModal(cfg.delMsg, { title: "Delete category", confirmText: "Delete" });
+    const ok = await confirmModal(cfg.delMsg, { title: "Delete", confirmText: "Delete" });
     if (!ok) return;
     try { await cfg.del(btn.closest(`[data-${a}]`).dataset[a]); toastOk("Deleted"); refresh(); }
     catch (err) { toastErr(err.message); }
   });
-  root.querySelector(cfg.addEl).addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = e.target.elements.name;
+
+  const add = async () => {
+    const input = root.querySelector(cfg.newEl);
     const name = input.value.trim();
     if (!name) return;
-    try { await cfg.create(name); input.value = ""; toastOk("Category added"); refresh(); }
+    try { await cfg.create(name); input.value = ""; refresh(); }
     catch (err) { toastErr(err.message); }
+  };
+  root.querySelector(cfg.addEl).addEventListener("click", add);
+  root.querySelector(cfg.newEl).addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); add(); }
   });
 
-  await refresh();
+  refresh();
+  return { refresh, rows: () => rows };
 }
 
 function renderTaxRows(root) {

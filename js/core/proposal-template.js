@@ -141,11 +141,10 @@ const FEES = () => [
 • Disbursements for Licensed Materials. Refer to Design Services Agreement
 • Subscription costs such as domain, web hosting, and all other necessary tools to implement the base scope are not included in the proposed base fees. The Client must pay costs associated with their own subscriptions.` },
 
-  // The rate comes from Settings → Default hourly rate, so a change there reaches every
-  // proposal. Settings has no day-rate field (Jim's is not simply hours x 8), so that
-  // one stays a bracket.
-  { part: "fees", level: 2, heading: "Hourly Rate ({{date.year}})", body:
-`• Principal Designer: {{rate.hourly}}/hour ({{rate.daily}} per day)` },
+  // The rate card comes from Settings → Rates: one bullet per staff tier, each with its
+  // hourly rate and the day that many hours makes. A change there reaches every
+  // proposal written afterwards.
+  { part: "fees", level: 2, heading: "Hourly Rate ({{date.year}})", body: `{{rate.list}}` },
 
   { part: "fees", level: 2, heading: "Payment Schedule" },
   // Percentages are edited; the amounts are worked out from the A. Base Scope total.

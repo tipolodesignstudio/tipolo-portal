@@ -21,17 +21,32 @@ export function buildTokenMap({ client = {}, proposal = {}, settings = {} }) {
     "fee.subtotal": money(subtotal),
     "business.name": settings.business_name || "Tipolo Design Studio",
     "business.email": settings.email || "",
-    // Settings → Default hourly rate. Unset falls back to a bracket so it prints red
+    // The default staff tier's rate. Unset falls back to a bracket so it prints red
     // rather than leaving a silent gap in the fee section.
     "rate.hourly": settings.default_hourly_rate
-      ? money(settings.default_hourly_rate) : "[set the hourly rate in Settings]",
-    // A day is eight hours unless Settings overrides it.
+      ? money(settings.default_hourly_rate) : NO_RATE,
+    // A day is however many hours Settings says (eight, normally).
     "rate.daily": settings.default_day_rate
-      ? money(settings.default_day_rate)
-      : settings.default_hourly_rate
-        ? money(settings.default_hourly_rate * 8) : "[set the hourly rate in Settings]",
+      ? money(settings.default_day_rate) : NO_RATE,
+    // Every tier, one bullet each — the rate card as it prints in the fee section.
+    "rate.list": rateList(settings),
     "date.year": String(new Date().getFullYear()),
   };
+}
+
+const NO_RATE = "[set the hourly rate in Settings]";
+
+// One line per staff tier, in the order Settings lists them. Written as bullets so it
+// lands in the document as a list, the way the rate card is set.
+function rateList(settings = {}) {
+  const hours = Number(settings.hours_per_day) || 8;
+  const tiers = (settings.staff_tiers || []).filter((t) => (t.name || "").trim());
+  if (!tiers.length) return `• [Add a staff tier in Settings]`;
+  return tiers.map((t) => {
+    const rate = t.hourly_rate == null || t.hourly_rate === "" ? null : Number(t.hourly_rate);
+    return `• ${t.name}: ${rate == null ? NO_RATE : money(rate)}/hour`
+      + `${rate == null ? "" : ` (${money(rate * hours)} per day)`}`;
+  }).join("\n");
 }
 
 export function resolveTokens(text, map) {
@@ -54,5 +69,5 @@ export function resolveSections(sections, map) {
 export const TOKEN_HELP = [
   "{{client.name}}", "{{client.contact}}", "{{client.firstName}}", "{{project.title}}", "{{project.scope}}",
   "{{proposal.number}}", "{{proposal.validUntil}}", "{{date.today}}", "{{date.year}}",
-  "{{fee.subtotal}}", "{{rate.hourly}}", "{{rate.daily}}", "{{business.name}}",
+  "{{fee.subtotal}}", "{{rate.hourly}}", "{{rate.daily}}", "{{rate.list}}", "{{business.name}}",
 ];
