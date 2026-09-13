@@ -1,0 +1,69 @@
+<!doctype html>
+<meta charset="utf-8"><title>proposal PDF preview check</title>
+<!--
+  Mounts the proposal builder with a stubbed database and storage, to exercise the
+  Document / Original PDF switch in the preview pane.
+  ?attached=0 mounts a proposal with no PDF, to check the empty state.
+  Open it at http://localhost:4173/dev/proposal-pdf-check.html
+  Nothing here ships with the app.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<link rel="stylesheet" href="../css/document.css">
+<style>html,body{height:100%;margin:0} #app{height:100%}
+  #err{position:fixed;bottom:0;left:0;right:0;z-index:99;background:#F5E3DC;color:#B3341C;
+       font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;padding:8px}</style>
+<div id="app"></div>
+<div id="err" hidden></div>
+<script type="module">
+  const err = document.getElementById("err");
+  const fail = (m) => { err.hidden = false; err.textContent += m + "\n"; };
+  window.addEventListener("error", (e) => fail(e.message));
+  window.addEventListener("unhandledrejection", (e) => fail(String(e.reason)));
+
+  const attached = new URLSearchParams(location.search).get("attached") !== "0";
+  const { defaultSections, defaultLineItems } = await import("../js/core/proposal-template.js");
+
+  const PROPOSAL = {
+    id: "p1", number: "26102", status: "draft", title: "Connect Landscape Architecture Website Redesign",
+    project_scope: "multimedia", sections: defaultSections(), line_items: defaultLineItems(),
+    // A full URL is passed through by proposalSourceUrl() unchanged, which is how a
+    // real PDF gets into the frame here — a storage path would need a real signature.
+    source_pdf_path: attached ? `${location.origin}/dev/sample-proposal.pdf` : null,
+    client: { id: "c1", name: "Connect Landscape Architecture", contacts: [
+      { name: "Ken Larsson", title: "Sr. Principal", is_primary: true }] },
+  };
+
+  const real = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = typeof input === "string" ? input : input.url;
+    const json = (b) => new Response(JSON.stringify(b),
+      { status: 200, headers: { "content-type": "application/json" } });
+    // Signed-URL requests for the private bucket: hand back a local file.
+    if (url.includes("/storage/v1/object/sign/")) return json({ signedURL: "/dev/sample-proposal.pdf?token=stub" });
+    if (url.includes("/storage/v1/")) return json({ Key: "proposal-sources/stub.pdf", path: "stub.pdf" });
+    if (!url.includes("/rest/v1/")) return real(input, init);
+    if (url.includes("app_settings")) return json({ id: 1, business_name: "Tipolo Design Studio", currency: "CAD", hours_per_day: 8 });
+    if (url.includes("staff_tiers")) return json([{ id: "t1", name: "Principal Designer", hourly_rate: 85, is_default: true }]);
+    if (url.includes("proposals")) {
+      const body = init?.body ? JSON.parse(init.body) : null;
+      if (body) Object.assign(PROPOSAL, body);
+      return json(PROPOSAL);
+    }
+    return json([]);
+  };
+
+  // Private bucket, so the app asks for a signed URL — hand it a local file.
+  const { supabase } = await import("../js/core/supabase.js");
+  supabase.auth.getSession = async () => ({ data: { session: { user: { id: "u1" } } } });
+  // storage is stubbed at the fetch layer above — supabase.storage hands out a fresh
+  // client on each access, so patching its methods here would not stick.
+
+  const { render } = await import("../js/views/proposal-detail.js");
+  await render(document.getElementById("app"), {
+    params: { id: "p1" }, path: "/proposals/p1",
+    setCrumbs() {}, navigate(p) { console.log("[stub] navigate", p); },
+  });
+</script>

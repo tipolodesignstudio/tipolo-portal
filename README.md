@@ -130,6 +130,10 @@ margins (`.doc:not(.letterhead)`).
 - **Landscape schedule** — a gantt chart wider than the portrait column (over 6 week
   columns, or 10 working-day columns) moves to a landscape page of its own, heading and
   all. Only when it has to; a six-week chart stays in place.
+- **Document / Original PDF** — the preview pane shows either the page being built or
+  the PDF the proposal was imported from, in the browser's own viewer. Without one
+  attached, the PDF side offers to attach it; that also fixes an import whose upload
+  didn't land.
 - **Fit / 50 / 75 / 100%** zoom, and a draggable divider. Both are remembered.
 - **Text tools** — Bold, Italic, Underline (⌘B / ⌘I / ⌘U, and they toggle), bullets,
   numbering and indent. The stored text stays plain: `**bold**`, `*italic*`,

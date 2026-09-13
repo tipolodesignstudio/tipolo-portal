@@ -739,6 +739,21 @@ export async function uploadProposalSource(file) {
   return path;
 }
 
+// Attach (or replace) the PDF on a proposal that already exists — the way to fix an
+// import that came through without one.
+export async function attachProposalSource(proposalId, file) {
+  const path = await uploadProposalSource(file);
+  return updateProposal(proposalId, { source_pdf_path: path });
+}
+
+// The name the file was uploaded under. uploadProposalSource() prefixes it with
+// "src-<when>-<random>-", so the original is still in there.
+export function proposalSourceName(path) {
+  if (!path) return "";
+  const base = String(path).split("/").pop();
+  return base.replace(/^src-\d+-[a-z0-9]+-/i, "") || base;
+}
+
 export async function proposalSourceUrl(pathOrUrl) {
   if (!pathOrUrl) return null;
   let path = String(pathOrUrl);

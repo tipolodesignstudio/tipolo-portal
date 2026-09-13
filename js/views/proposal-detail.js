@@ -14,7 +14,8 @@ import { escapeHtml, money, num, date, debounce } from "../core/format.js";
 import { on } from "../core/render.js";
 import {
   getProposal, updateProposal, deleteProposal, setProposalStatus, convertProposal,
-  getSettings, proposalSourceUrl, updateClient, saveClientContacts, clientPrimaryContact,
+  getSettings, proposalSourceUrl, proposalSourceName, attachProposalSource,
+  updateClient, saveClientContacts, clientPrimaryContact,
 } from "../core/api.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { TOKEN_HELP } from "../core/tokens.js";
@@ -87,7 +88,7 @@ export async function render(root, ctx) {
           <div class="crumbs">
             <a href="#/proposals">← Proposals</a> ·
             <a href="#/clients/${p.client?.id}">${escapeHtml(p.client?.name || "client")}</a>
-            ${p.source_pdf_path ? ` · <a href="#" data-source>original PDF</a>` : ""}
+            <span data-source-crumb></span>
           </div>
           <h1>
             ${p.number ? `<span class="num">${escapeHtml(p.number)}</span>` : ""}
@@ -130,9 +131,12 @@ export async function render(root, ctx) {
         </div>
         <div class="splitter" data-splitter role="separator" aria-orientation="vertical"
              tabindex="0" aria-label="Resize the editor"></div>
-        <div class="pane pane-preview" id="preview">
+        <div class="pane pane-preview" id="preview" data-mode="doc">
           <div class="preview-bar">
-            <span class="lbl-sm">Print preview</span>
+            <div class="seg" role="group" aria-label="What to preview">
+              <button type="button" data-pv="doc" class="active">Document</button>
+              <button type="button" data-pv="pdf">Original PDF</button>
+            </div>
             <select data-zoom aria-label="Preview zoom">
               <option value="fit">Fit</option>
               <option value="0.5">50%</option>
@@ -142,6 +146,7 @@ export async function render(root, ctx) {
             <span class="pages" data-pages></span>
           </div>
           <div class="paper-wrap"><div class="paper" id="paper"></div></div>
+          <div class="pdf-wrap" id="pdfwrap"></div>
         </div>
       </div>
     </div>`;
@@ -151,6 +156,7 @@ export async function render(root, ctx) {
   const editor = root.querySelector("#editor");
   const previewPane = root.querySelector("#preview");
   const paper = root.querySelector("#paper");
+  const pdfWrap = root.querySelector("#pdfwrap");
   const pagesLabel = root.querySelector("[data-pages]");
   const zoomSel = root.querySelector("[data-zoom]");
   const actions = root.querySelector("#actions");
@@ -373,6 +379,83 @@ export async function render(root, ctx) {
     pagesLabel.textContent = `${n} page${n === 1 ? "" : "s"}`
       + (land ? ` · ${land} landscape` : "");
     if (zoomMode === "fit") applyZoom();
+  }
+
+  /* ---- the other half of the preview: the PDF this proposal came from ----
+     Rendered in an iframe rather than drawn onto a canvas: the browser's own viewer
+     already scrolls, zooms and searches, and this is the document exactly as it was
+     sent — which is the whole point of looking at it. */
+
+  let previewMode = "doc";
+  let pdfLoaded = false;
+
+  function setPreviewMode(next) {
+    previewMode = next;
+    previewPane.dataset.mode = next;
+    root.querySelectorAll("[data-pv]").forEach((b) => b.classList.toggle("active", b.dataset.pv === next));
+    zoomSel.hidden = next !== "doc";
+    pagesLabel.hidden = next !== "doc";
+    if (next === "pdf") showPdf();
+  }
+
+  async function showPdf({ force = false } = {}) {
+    if (pdfLoaded && !force) return;
+    if (!p.source_pdf_path) {
+      pdfLoaded = false;
+      pdfWrap.innerHTML = `
+        <div class="pdf-empty">
+          <h3>No PDF attached</h3>
+          <p class="faint">This proposal wasn't imported from a PDF, or the upload didn't
+            land. Attach one and it shows here — and follows the proposal into its project.</p>
+          <label class="btn subtle sm">
+            Attach a PDF<input type="file" accept="application/pdf,.pdf" id="pdf-attach" hidden />
+          </label>
+        </div>`;
+      return;
+    }
+    pdfWrap.innerHTML = `<div class="loading-row"><span class="spinner"></span> Opening the PDF…</div>`;
+    try {
+      // The bucket is private, so the frame needs a signed URL.
+      const url = await proposalSourceUrl(p.source_pdf_path);
+      pdfWrap.innerHTML = `<iframe src="${escapeHtml(url)}#view=FitH"
+        title="${escapeHtml(proposalSourceName(p.source_pdf_path) || "Original PDF")}"></iframe>`;
+      pdfLoaded = true;
+    } catch (err) {
+      pdfLoaded = false;
+      pdfWrap.innerHTML = `<div class="pdf-empty">
+        <h3>Couldn't open the PDF</h3>
+        <p class="faint">${escapeHtml(err.message)}</p>
+        <label class="btn subtle sm">
+          Attach a PDF<input type="file" accept="application/pdf,.pdf" id="pdf-attach" hidden />
+        </label>
+      </div>`;
+    }
+  }
+
+  on(root, "click", "[data-pv]", (e, btn) => setPreviewMode(btn.dataset.pv));
+
+  on(root, "change", "#pdf-attach", async (e, input) => {
+    const f = input.files[0];
+    if (!f) return;
+    pdfWrap.innerHTML = `<div class="loading-row"><span class="spinner"></span> Uploading ${escapeHtml(f.name)}…</div>`;
+    try {
+      p = await attachProposalSource(p.id, f);
+      toastOk("PDF attached");
+      renderCrumbSource();
+      showPdf({ force: true });
+    } catch (err) {
+      toastErr(err.message);
+      showPdf({ force: true });
+    }
+  });
+
+  // The crumb link appears as soon as there is something to link to.
+  function renderCrumbSource() {
+    const host = root.querySelector("[data-source-crumb]");
+    if (!host) return;
+    host.innerHTML = p.source_pdf_path
+      ? ` · <a href="#" data-source>${escapeHtml(proposalSourceName(p.source_pdf_path) || "original PDF")}</a>`
+      : "";
   }
 
   function scrollPreviewTo(i) {
@@ -906,6 +989,7 @@ export async function render(root, ctx) {
 
   renderEditor();
   renderActions();
+  renderCrumbSource();
   applyZoom();
   paintPreview();
 }

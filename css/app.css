@@ -945,3 +945,36 @@ table.mini input.bad {
 #phases .list-row .icon-btn { margin-left: 0; }
 #phases .list-row .icon-btn[data-del-phase] { margin-left: 4px; }
 #phases .list-row .icon-btn[disabled] { opacity: .35; cursor: default; }
+
+/* ---- preview: the built document, or the PDF it came from ---- */
+.preview-bar .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.preview-bar .seg button {
+  border: 0; background: var(--card-bg); cursor: pointer;
+  padding: 3px 10px; font: inherit; font-size: .78rem; color: var(--ink-soft);
+}
+.preview-bar .seg button + button { border-left: 1px solid var(--border); }
+.preview-bar .seg button:hover { background: var(--bg-alt); color: var(--ink); }
+.preview-bar .seg button.active { background: var(--accent); color: #F5F2E9; }
+
+/* The iframe has to fill the pane, so in PDF mode the pane stops scrolling and becomes
+   the frame's container instead. */
+.pdf-wrap { display: none; }
+.pane-preview[data-mode="pdf"] {
+  display: flex; flex-direction: column;
+  overflow: hidden; padding-bottom: 0;
+}
+.pane-preview[data-mode="pdf"] .preview-bar { position: static; flex: none; }
+.pane-preview[data-mode="pdf"] .paper-wrap { display: none; }
+.pane-preview[data-mode="pdf"] .pdf-wrap { display: flex; flex: 1; min-height: 0; }
+.pdf-wrap iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.pdf-wrap .loading-row { margin: 24px auto; }
+
+.pdf-empty { margin: auto; max-width: 380px; padding: 24px; text-align: center; }
+.pdf-empty h3 { margin: 0 0 6px; font-size: 1rem; }
+.pdf-empty p { margin: 0 0 14px; font-size: .88rem; line-height: 1.5; }
+
+/* Stacked as tabs, the pane has no height of its own to give the frame. */
+@media (max-width: 1000px) {
+  .pane-preview[data-mode="pdf"] { overflow: visible; }
+  .pane-preview[data-mode="pdf"] .pdf-wrap { min-height: 70vh; }
+}
