@@ -23,18 +23,28 @@
   window.addEventListener("error", (e) => fail(e.message));
   window.addEventListener("unhandledrejection", (e) => fail(String(e.reason)));
 
-  const attached = new URLSearchParams(location.search).get("attached") !== "0";
+  const qs = new URLSearchParams(location.search);
+  const attached = qs.get("attached") !== "0";
+  // ?mode=builder mounts a proposal written in the builder, to check that path too.
+  const docMode = qs.get("mode") === "builder" ? "builder" : "pdf";
   const { defaultSections, defaultLineItems } = await import("../js/core/proposal-template.js");
 
   const PROPOSAL = {
     id: "p1", number: "26102", status: "draft", title: "Connect Landscape Architecture Website Redesign",
-    project_scope: "multimedia", sections: defaultSections(), line_items: defaultLineItems(),
+    project_scope: "multimedia", doc_mode: docMode,
+    sections: docMode === "pdf" ? [] : defaultSections(),
+    line_items: docMode === "pdf"
+      ? [{ description: "Site inventory and analysis", qty: 1, unit_price: 2400 },
+         { description: "Concept design (2 options)", qty: 1, unit_price: 6800 }]
+      : defaultLineItems(),
     // A full URL is passed through by proposalSourceUrl() unchanged, which is how a
     // real PDF gets into the frame here — a storage path would need a real signature.
     source_pdf_path: attached ? `${location.origin}/dev/sample-proposal.pdf` : null,
     client: { id: "c1", name: "Connect Landscape Architecture", contacts: [
       { name: "Ken Larsson", title: "Sr. Principal", is_primary: true }] },
   };
+
+  window.__revs = [{ id: "r1", revised_on: "2026-09-10", note: "Fees revised after the client call" }];
 
   const real = window.fetch.bind(window);
   window.fetch = async (input, init) => {
@@ -47,6 +57,27 @@
     if (!url.includes("/rest/v1/")) return real(input, init);
     if (url.includes("app_settings")) return json({ id: 1, business_name: "Tipolo Design Studio", currency: "CAD", hours_per_day: 8 });
     if (url.includes("staff_tiers")) return json([{ id: "t1", name: "Principal Designer", hourly_rate: 85, is_default: true }]);
+    if (url.includes("proposal_revisions")) {
+      const method = (init?.method || "GET").toUpperCase();
+      const body = init?.body ? JSON.parse(init.body) : null;
+      if (method === "GET") return json(window.__revs);
+      if (method === "POST") {
+        const r = { id: "r" + Math.random().toString(36).slice(2, 6), note: "", ...body };
+        window.__revs.unshift(r);
+        return json(r);
+      }
+      if (method === "PATCH") {
+        const id = (url.match(/id=eq\.([^&]+)/) || [])[1];
+        const r = window.__revs.find((x) => x.id === id);
+        Object.assign(r, body);
+        return json(r);
+      }
+      if (method === "DELETE") {
+        const id = (url.match(/id=eq\.([^&]+)/) || [])[1];
+        window.__revs = window.__revs.filter((x) => x.id !== id);
+        return json([]);
+      }
+    }
     if (url.includes("proposals")) {
       const body = init?.body ? JSON.parse(init.body) : null;
       if (body) Object.assign(PROPOSAL, body);

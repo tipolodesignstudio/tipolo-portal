@@ -1078,3 +1078,61 @@ update public.projects p
  where pr.converted_project_id = p.id
    and pr.source_pdf_path is not null
    and p.source_pdf_path is null;
+
+-- ===== 0023_proposal_revisions.sql =====
+-- 0023 — a proposal's revision history
+--
+-- Hand-written entries, not automatic snapshots: a date and what changed, the way a
+-- revision block on a drawing set reads. Editable and deletable, because a log nobody
+-- can correct stops being kept.
+
+create table if not exists public.proposal_revisions (
+  id          uuid primary key default gen_random_uuid(),
+  proposal_id uuid not null references public.proposals(id) on delete cascade,
+  revised_on  date not null default current_date,
+  note        text,
+  created_by  uuid references auth.users(id) default auth.uid(),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists proposal_revisions_proposal
+  on public.proposal_revisions (proposal_id, revised_on desc, created_at desc);
+
+drop trigger if exists proposal_revisions_set_updated_at on public.proposal_revisions;
+create trigger proposal_revisions_set_updated_at
+  before update on public.proposal_revisions
+  for each row execute function public.set_updated_at();
+
+alter table public.proposal_revisions enable row level security;
+drop policy if exists proposal_revisions_all on public.proposal_revisions;
+create policy proposal_revisions_all on public.proposal_revisions
+  for all to authenticated using (true) with check (true);
+
+-- ===== 0024_proposal_doc_mode.sql =====
+-- 0024 — a proposal is either built here or it is a PDF
+--
+-- A proposal imported from a finished PDF is not a document to rebuild: the PDF is the
+-- document. The portal only wants the client and the fee schedule out of it, so those
+-- can drive the project, its budget and its invoices.
+--
+--   'builder'  written in the proposal builder; sections are the document
+--   'pdf'      the attached PDF is the document; sections are unused
+
+alter table public.proposals
+  add column if not exists doc_mode text not null default 'builder';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'proposals_doc_mode_check') then
+    alter table public.proposals
+      add constraint proposals_doc_mode_check check (doc_mode in ('builder', 'pdf'));
+  end if;
+end $$;
+
+-- Proposals already imported from a PDF that were never written in the builder.
+update public.proposals
+   set doc_mode = 'pdf'
+ where source_pdf_path is not null
+   and doc_mode = 'builder'
+   and coalesce(jsonb_array_length(sections), 0) = 0;

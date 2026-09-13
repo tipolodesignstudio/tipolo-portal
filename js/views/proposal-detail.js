@@ -16,6 +16,7 @@ import {
   getProposal, updateProposal, deleteProposal, setProposalStatus, convertProposal,
   getSettings, proposalSourceUrl, proposalSourceName, attachProposalSource,
   updateClient, saveClientContacts, clientPrimaryContact,
+  listProposalRevisions, addProposalRevision, updateProposalRevision, deleteProposalRevision,
 } from "../core/api.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { TOKEN_HELP } from "../core/tokens.js";
@@ -46,6 +47,19 @@ const KIND_LABEL = {
   signature: "Signature block",
 };
 
+// Not a part of the document — a log kept beside it. It sits in the same nav because
+// that is where you look for everything else about the proposal.
+const REVISIONS = { id: "revisions", label: "Revisions" };
+
+/* A proposal imported from a finished PDF has no document to build: the PDF is the
+   document. All the portal keeps of it is who it is for and what it is worth — the fee
+   lines that go on to set the project's budget and its invoices' Budget column. */
+const PDF_PARTS = [
+  { id: "client", label: "Client" },
+  { id: "fees", label: "Fee schedule" },
+  REVISIONS,
+];
+
 let detach = null;  // teardown for the previously mounted builder
 
 export async function render(root, ctx) {
@@ -66,15 +80,18 @@ export async function render(root, ctx) {
 
   /* ---------------- state ---------------- */
 
+  const editable = p.status === "draft";
+  const pdfBacked = p.doc_mode === "pdf";
+
   let blocks = normaliseSections(p.sections || []);
   let items = (p.line_items || []).map((li) => ({ ...li }));
   let title = p.title || "";
   let scope = p.project_scope || "other";
-  let part = PARTS[0].id;
+  let part = (pdfBacked ? PDF_PARTS : PARTS)[0].id;
   let dirty = false;
   let activeBlk = -1;
+  let revisions = [];
 
-  const editable = p.status === "draft";
   const subtotal = () => items.reduce((s, li) => s + lineAmount(li), 0);
   const live = () => ({ ...p, title, project_scope: scope, sections: blocks, line_items: items });
   const inPart = (i) => (blocks[i].part || "workplan") === part;
@@ -131,12 +148,14 @@ export async function render(root, ctx) {
         </div>
         <div class="splitter" data-splitter role="separator" aria-orientation="vertical"
              tabindex="0" aria-label="Resize the editor"></div>
-        <div class="pane pane-preview" id="preview" data-mode="doc">
+        <div class="pane pane-preview" id="preview" data-mode="${pdfBacked ? "pdf" : "doc"}">
           <div class="preview-bar">
-            <div class="seg" role="group" aria-label="What to preview">
-              <button type="button" data-pv="doc" class="active">Document</button>
-              <button type="button" data-pv="pdf">Original PDF</button>
-            </div>
+            ${pdfBacked
+              ? `<span class="lbl-sm">Original PDF</span>`
+              : `<div class="seg" role="group" aria-label="What to preview">
+                   <button type="button" data-pv="doc" class="active">Document</button>
+                   <button type="button" data-pv="pdf">Original PDF</button>
+                 </div>`}
             <select data-zoom aria-label="Preview zoom">
               <option value="fit">Fit</option>
               <option value="0.5">50%</option>
@@ -165,9 +184,13 @@ export async function render(root, ctx) {
 
   /* ---------------- part navigation ---------------- */
 
+  const visibleParts = () => (pdfBacked ? PDF_PARTS : [...PARTS, REVISIONS]);
+
   function renderParts() {
-    partNav.innerHTML = PARTS.map((pt) => {
-      const n = blocks.filter((b) => (b.part || "workplan") === pt.id).length;
+    partNav.innerHTML = visibleParts().map((pt) => {
+      const n = pt.id === REVISIONS.id
+        ? revisions.length
+        : blocks.filter((b) => (b.part || "workplan") === pt.id).length;
       return `<button data-part="${pt.id}" class="${pt.id === part ? "active" : ""}">
         ${escapeHtml(pt.label)}${n ? `<span class="n">${n}</span>` : ""}</button>`;
     }).join("");
@@ -325,17 +348,65 @@ export async function render(root, ctx) {
     const missing = lines.filter((l) => !l.v).length;
     return `<div class="recip">
       <div class="between" style="margin-bottom:8px">
-        <h2>Addressed to</h2>
+        <h2>${pdfBacked ? "Client" : "Addressed to"}</h2>
         ${editable ? `<button class="btn subtle sm" data-edit-recipient>Edit details</button>` : ""}
       </div>
       <dl>${lines.map((l) => `<dt>${escapeHtml(l.k)}</dt>
         <dd class="${l.v ? (l.bold ? "b" : "") : "gap"}">${l.v ? escapeHtml(l.v) : "not set"}</dd>`).join("")}</dl>
       ${missing ? `<p class="hint" style="margin-top:8px">${missing} line${missing === 1 ? "" : "s"}
-        missing — they are simply left out of the letter until filled in.</p>` : ""}
+        missing — ${pdfBacked
+          ? "fill them in and every document for this client picks them up."
+          : "they are simply left out of the letter until filled in."}</p>` : ""}
+    </div>`;
+  }
+
+  /* The revision log. Rows save as you leave them, like the managed lists in Settings,
+     so it is independent of the document's own Save — and it stays editable after the
+     proposal is sent, which is exactly when revisions start happening. */
+  function revisionsPanel() {
+    return `<div class="b-card">
+      <div class="wb-kind">Revision history</div>
+      <table class="mini" id="revs"><thead><tr>
+        <th style="width:140px">Date</th><th>What changed</th><th style="width:32px"></th>
+      </tr></thead><tbody>
+      ${revisions.map((r) => `<tr data-rev="${r.id}">
+        <td><input data-rk2="revised_on" type="date" value="${escapeHtml(r.revised_on || "")}" /></td>
+        <td><input data-rk2="note" value="${escapeHtml(r.note || "")}"
+             placeholder="Fee schedule revised after the client call" /></td>
+        <td><button class="icon-btn" data-del-rev title="Delete">✕</button></td>
+      </tr>`).join("")}
+      </tbody></table>
+      ${revisions.length ? "" : `<p class="faint" style="font-size:.9rem;margin:8px 0 0">
+        Nothing logged yet.</p>`}
+      <button class="btn link sm" data-add-rev style="margin-top:8px">+ Add revision</button>
+      <p class="hint" style="margin-top:6px">Kept beside the proposal, not printed on it.
+        Entries save as you leave the field.</p>
+    </div>`;
+  }
+
+  // The fee schedule on its own, for a PDF-backed proposal: the numbers the portal
+  // needs, with a word about where they go next.
+  function feePanel() {
+    return `<div class="b-card">
+      <div class="wb-kind">Fee schedule</div>
+      ${feeEditor()}
+      <p class="hint" style="margin-top:8px">Read from the PDF. These lines set the
+        project's budget when the proposal is converted, and become the Budget column of
+        its invoices — so they are worth checking against the PDF beside them.</p>
     </div>`;
   }
 
   function renderEditor() {
+    if (part === REVISIONS.id) {
+      editor.innerHTML = revisionsPanel();
+      renderParts();
+      return;
+    }
+    if (pdfBacked) {
+      editor.innerHTML = part === "client" ? recipientPanel() : feePanel();
+      renderParts();
+      return;
+    }
     const idx = blocks.map((_, i) => i).filter(inPart);
     editor.innerHTML = (part === "cover" ? recipientPanel() : "");
     editor.innerHTML += idx.length
@@ -372,6 +443,7 @@ export async function render(root, ctx) {
   }
 
   function paintPreview() {
+    if (pdfBacked) return;      // the PDF is the document; there is nothing to build
     // proposalDocHtml() returns finished 8.5x11 sheets, so the preview is the pages.
     paper.innerHTML = proposalDocHtml(live(), settings);
     const n = paper.querySelectorAll(".sheet-page").length;
@@ -386,7 +458,7 @@ export async function render(root, ctx) {
      already scrolls, zooms and searches, and this is the document exactly as it was
      sent — which is the whole point of looking at it. */
 
-  let previewMode = "doc";
+  let previewMode = pdfBacked ? "pdf" : "doc";
   let pdfLoaded = false;
 
   function setPreviewMode(next) {
@@ -482,7 +554,9 @@ export async function render(root, ctx) {
     const s = p.status;
     const b = [];
     if (s === "draft") b.push(`<button class="btn ghost sm" data-save>Save</button>`);
-    b.push(`<button class="btn ghost sm" data-print>Save as PDF</button>`);
+    b.push(pdfBacked
+      ? `<button class="btn ghost sm" data-source>Open PDF</button>`
+      : `<button class="btn ghost sm" data-print>Save as PDF</button>`);
     if (s === "draft") b.push(`<button class="btn sm" data-status="sent">Mark as sent</button>`);
     if (s === "sent") b.push(`<button class="btn sm" data-status="accepted">Accepted</button>`,
                              `<button class="btn ghost sm" data-status="declined">Declined</button>`,
@@ -644,6 +718,45 @@ export async function render(root, ctx) {
     blocks[i].rows.splice(+el.closest("tr").dataset.j, 1);
     renderEditor();
     touched();
+  });
+
+  /* ---- revision log ---- */
+  on(root, "click", "[data-add-rev]", async () => {
+    try {
+      const r = await addProposalRevision(p.id, { revised_on: new Date().toISOString().slice(0, 10) });
+      revisions.unshift(r);
+      renderEditor();
+      editor.querySelector(`tr[data-rev="${r.id}"] [data-rk2=note]`)?.focus();
+    } catch (err) { toastErr(err.message); }
+  });
+
+  const commitRevision = async (el) => {
+    const tr = el.closest("[data-rev]");
+    if (!tr) return;
+    const row = revisions.find((r) => r.id === tr.dataset.rev);
+    const field = el.dataset.rk2;
+    const value = field === "revised_on" ? (el.value || null) : el.value;
+    if (row && String(row[field] ?? "") === String(value ?? "")) return;   // untouched
+    try {
+      const saved = await updateProposalRevision(tr.dataset.rev, { [field]: value });
+      Object.assign(row || {}, saved);
+    } catch (err) { toastErr(err.message); }
+  };
+  // focusout, not blur: blur does not bubble to a delegated handler.
+  on(root, "focusout", "#revs [data-rk2]", (e, el) => commitRevision(el));
+  // A date picked from the calendar popup fires change, not necessarily focusout.
+  on(root, "change", "#revs input[type=date][data-rk2]", (e, el) => commitRevision(el));
+  on(root, "keydown", "#revs [data-rk2]", (e, el) => {
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+  });
+  on(root, "click", "[data-del-rev]", async (e, el) => {
+    const id = el.closest("[data-rev]").dataset.rev;
+    if (!(await confirmModal("Delete this revision entry?", { confirmText: "Delete" }))) return;
+    try {
+      await deleteProposalRevision(id);
+      revisions = revisions.filter((r) => r.id !== id);
+      renderEditor();
+    } catch (err) { toastErr(err.message); }
   });
 
   /* ---- list formatting, applied to the selected lines ---- */
@@ -991,5 +1104,10 @@ export async function render(root, ctx) {
   renderActions();
   renderCrumbSource();
   applyZoom();
-  paintPreview();
+  if (pdfBacked) { zoomSel.hidden = true; pagesLabel.hidden = true; showPdf(); }
+  else paintPreview();
+
+  listProposalRevisions(p.id)
+    .then((rows) => { revisions = rows; renderParts(); if (part === REVISIONS.id) renderEditor(); })
+    .catch(() => { /* pre-0023 database */ });
 }

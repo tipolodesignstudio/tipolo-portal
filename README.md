@@ -130,10 +130,12 @@ margins (`.doc:not(.letterhead)`).
 - **Landscape schedule** — a gantt chart wider than the portrait column (over 6 week
   columns, or 10 working-day columns) moves to a landscape page of its own, heading and
   all. Only when it has to; a six-week chart stays in place.
-- **Document / Original PDF** — the preview pane shows either the page being built or
-  the PDF the proposal was imported from, in the browser's own viewer. Without one
-  attached, the PDF side offers to attach it; that also fixes an import whose upload
-  didn't land.
+- **Document / Original PDF** — a proposal written here can also carry the PDF it was
+  imported from; the preview pane switches between the page being built and that file,
+  in the browser's own viewer. Without one attached, the PDF side offers to attach it.
+- **Revisions** — a hand-kept log beside the proposal: a date and what changed, added,
+  edited and deleted in place, and still editable after the proposal is sent. It is not
+  printed on the document.
 - **Fit / 50 / 75 / 100%** zoom, and a draggable divider. Both are remembered.
 - **Text tools** — Bold, Italic, Underline (⌘B / ⌘I / ⌘U, and they toggle), bullets,
   numbering and indent. The stored text stays plain: `**bold**`, `*italic*`,
@@ -192,28 +194,32 @@ Numbering is `YYNNN-XXX` — the project's job number, then a per-project counte
 
 ## Importing a proposal from a PDF
 
-**Proposals → Import PDF.** The PDF is read in the browser (`pdf.js` is vendored, same as
-the Supabase client) and `js/core/proposal-parse.js` turns it into a draft: title, client,
-scope, phases, sections and fee lines.
+**Proposals → Import PDF.** A finished proposal is not taken apart and rebuilt here —
+**the PDF is the proposal**. It is attached and shown as the document, and the only
+things lifted out of it are the two the portal needs to work with:
 
-It then asks **what should come across**:
+| Read from the PDF | What it is for |
+|---|---|
+| Client (matched to an existing one, or created) | who the proposal, project and invoices belong to |
+| Fee schedule | the project's budget, and the Budget column of its invoices |
 
-- **Phases & fees only** — the task list and the fee schedule, nothing else. The phases
-  become the Work Plan headings and the rows of the schedule chart (undated, so the
-  chart prints its red "set the dates" prompt rather than inventing a programme). The
-  wording is not imported: the PDF is attached instead, and can be read as it was
-  written. That attachment is not optional here, and it follows the proposal into its
-  project when the proposal is converted — **original PDF** sits in the header of both.
-- **The whole document** — also brings the prose across as editable sections, for a
-  proposal you mean to rewrite in the builder.
+The title and scope come across too, since the project needs them. Everything else —
+the cover letter, the work plan, the schedule, the agreement — stays in the PDF, which
+is where you read it.
 
-Nothing is saved until you review it and press **Create draft proposal** — or, in whole-
-document mode, **Save as template**, which stores the same sections and fee lines under
-Proposals → Templates with the client's name swapped for `{{client.name}}`.
+So an imported proposal opens differently from one written here: three tabs
+(**Client**, **Fee schedule**, **Revisions**), the PDF filling the preview pane, and
+**Open PDF** in place of Save as PDF. `proposals.doc_mode` is what distinguishes the
+two — `'pdf'` for an import, `'builder'` for one written in the builder. The attachment
+follows the proposal into its project when it is converted.
 
-Everything is read in your browser — the PDF is never sent anywhere. A document laid out
-unlike your usual proposals, or a scan with no text layer, will come back mostly empty;
-fill the review screen in by hand from there.
+**Save the wording as a template** is still offered on the review screen: the prose is
+parsed, not to become the proposal's own text, but so it can be harvested into a
+reusable template with the client's name swapped for `{{client.name}}`.
+
+Everything is read in your browser — the PDF is never sent anywhere except to your own
+Supabase storage. A document laid out unlike your usual proposals, or a scan with no
+text layer, will come back mostly empty; fill the review screen in by hand from there.
 
 To check the parser against a real document, drop a PDF in `dev/` and open
 `/dev/parser-check.html?pdf=<name>`; it prints every line with its font size and the

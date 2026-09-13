@@ -848,6 +848,29 @@ export async function convertProposal(proposal, { status = "lead", start_date = 
   return project;
 }
 
+/* ---------------- proposal revisions ---------------- */
+// A hand-kept log of what changed and when. Newest first, which is the order a
+// revision block is read in.
+
+export async function listProposalRevisions(proposalId) {
+  return unwrap(await supabase.from("proposal_revisions").select("*")
+    .eq("proposal_id", proposalId)
+    .order("revised_on", { ascending: false })
+    .order("created_at", { ascending: false }));
+}
+export async function addProposalRevision(proposalId, patch = {}) {
+  return unwrap(await supabase.from("proposal_revisions")
+    .insert({ proposal_id: proposalId, ...patch }).select().single());
+}
+export async function updateProposalRevision(id, patch) {
+  return unwrap(await supabase.from("proposal_revisions")
+    .update(patch).eq("id", id).select().single());
+}
+export async function deleteProposalRevision(id) {
+  const { error } = await supabase.from("proposal_revisions").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 /* ---------------- storage (branding logo) ---------------- */
 
 export async function uploadLogo(file) { return uploadBranding(file, "logo"); }

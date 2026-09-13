@@ -45,6 +45,8 @@ That one file bundles every migration:
 | `0020_invoice_document.sql` | The invoice as a document: progress lines, editable sections, `YYNNN-XXX` numbering |
 | `0021_tiers_and_numbering.sql` | Staff rate tiers, hours per day, and the January reset (`YY001` internal, client work from `YY101`) |
 | `0022_project_source_pdf.sql` | An imported proposal's PDF follows it into its project |
+| `0023_proposal_revisions.sql` | A hand-kept revision log on each proposal |
+| `0024_proposal_doc_mode.sql` | A proposal is either built here or is an attached PDF |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
