@@ -47,6 +47,7 @@ That one file bundles every migration:
 | `0022_project_source_pdf.sql` | An imported proposal's PDF follows it into its project |
 | `0023_proposal_revisions.sql` | A hand-kept revision log on each proposal |
 | `0024_proposal_doc_mode.sql` | A proposal is either built here or is an attached PDF |
+| `0025_books.sql` | Income & Expense Tracker: income (paid invoices add themselves), fixed costs, Drive-filed receipts, the tracker's categories and payment methods |
 
 *(If you'd rather run them one at a time, the individual files are in
 `supabase/migrations/` — run them in numeric order. When a new phase adds a migration,
@@ -151,6 +152,50 @@ Wait for it to propagate (minutes to an hour), then in **Settings → Pages** ti
 
 ### d. Verify
 Open `https://portal.tipolo.ca` → the sign-in screen loads over HTTPS → sign in.
+
+---
+
+## 8. Google Drive (receipts + the Excel tracker)
+
+Income & Expenses files receipts into **01_Admin → Accounting → Receipts** and rewrites
+**Tipolo Income & Expense Tracker.xlsx** there after every change. The browser talks to
+Drive directly, so it needs a Google OAuth client ID. Everything here is free.
+
+### a. Google Cloud project
+1. Go to **console.cloud.google.com**, signed in as `jim@tipolo.ca`.
+2. Project picker (top bar) → **New project** → name it `Tipolo Portal` → **Create**, then select it.
+3. **APIs & Services → Library** → search **Google Drive API** → **Enable**.
+
+### b. Consent screen (internal — no Google review)
+1. **APIs & Services → OAuth consent screen** (or **Google Auth Platform → Branding**) → **Get started**.
+2. App name `Tipolo Portal`, support email `jim@tipolo.ca`.
+3. Audience: **Internal**. This limits sign-in to `@tipolo.ca` Workspace accounts, and
+   internal apps don't go through Google's verification.
+4. Contact email → `jim@tipolo.ca` → **Create**.
+5. **Data access → Add or remove scopes** → add `https://www.googleapis.com/auth/drive` → **Update** → **Save**.
+
+### c. The client ID
+1. **APIs & Services → Credentials → + Create credentials → OAuth client ID**.
+2. Application type **Web application**, name `Portal`.
+3. **Authorized JavaScript origins** → add `https://portal.tipolo.ca` and `http://localhost:4176`
+   (and `http://localhost:4173` if you use the dev-server script). No redirect URIs are needed.
+4. **Create** → copy the **Client ID** (`….apps.googleusercontent.com`). It's public, so
+   it's safe to commit. There's no client secret to handle: this flow doesn't use one.
+5. Paste it into `config.js` as `GOOGLE_CLIENT_ID`, commit and push.
+
+### d. Link the folder
+1. Portal → **Settings → Google Drive** → **Connect Google Drive** (a Google popup — allow it).
+2. Open **01_Admin → Accounting** in Google Drive in the browser and copy the address bar URL.
+3. Paste it into the portal → **Link folder**. It finds `Receipts` and the tracker, and the
+   first time it saves a copy of the tracker as **“… (before portal).xlsx”**.
+4. **Income & Expenses → Import from Excel…** → pick the tracker from your Drive folder, and
+   check the counts before you confirm. After that, add entries in the portal: the Excel file
+   is rewritten from the portal, so anything typed straight into it gets replaced.
+
+### e. Staff
+Each person connects Google once per browser session. They need edit access in Drive to
+the **Receipts** folder and to the **tracker file**. Share just those two (right-click →
+Share), not the whole Accounting folder, which also holds Tax Documents and Payments.
 
 ---
 

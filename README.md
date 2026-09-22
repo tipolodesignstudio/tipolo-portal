@@ -73,16 +73,38 @@ dev/                       local parser check (not used by the app)
 | 3 | Invoices + tax + numbering | ✅ built |
 | 4 | Proposals + templates + conversion | ✅ built |
 | 5 | Expenses (project & business, re-billable) | ✅ built |
+| — | Income & Expenses: the Excel tracker in the portal, receipts and the .xlsx kept in Google Drive | ✅ built |
 | — | Proposal PDF import (read a PDF into a draft, or save it as a template) | ✅ built |
 | — | Proposal builder: split editor + live print preview, house format, gantt schedule | ✅ built |
 | — | Invoice builder: the same split workspace, progress billing against the proposal | ✅ built |
 
 Full plan: `~/.claude/plans/snuggly-beaming-wall.md`.
 
+## Income & Expenses
+
+The Income & Expense Tracker workbook, rebuilt as four tabs: **Expenses**, **Income**,
+**Summary** and **Fixed Costs**. The portal is the record. After each change the workbook
+in Google Drive is rewritten from it (`js/core/books.js`, `js/core/tracker-xlsx.js`).
+The current file is used as the template and only its data rows are swapped, so the
+formatting, dropdowns and Summary formulas all survive, and Excel recalculates when the
+file opens. Columns are found by header text. The zip reading and writing are the
+browser's own (`js/core/zip.js`), with no library.
+
+- **Receipts** go to `Receipts/<year>/<MM Month>/YY-MM-DD Description.ext`. If an
+  expense's date or description changes later, its receipt is renamed or moved to match.
+  Deleting an expense leaves its receipt in Drive.
+- **Income:** marking an invoice paid adds its row (a database trigger does it), and
+  reopening the invoice removes it. Other income is added by hand.
+- **Excel sync:** `app_settings.books_changed_at` vs `tracker_synced_at`. The page shows
+  whether Excel is behind, and while Drive is connected it syncs a moment after each change.
+- **Import from Excel…** reads the workbook and skips anything already in the portal.
+- Setup: SETUP.md §8. Harness: `dev/books-check.html` (stubbed database + stubbed Drive)
+  and `dev/tracker-check.html` (workbook round trip).
+
 ## Settings
 
-Five tabs: **Business** (identity, logo, signature), **Rates**, **Taxes**, **Numbering**,
-**Categories**. The tabbed panels share one Save button; the managed lists — staff tiers,
+Six tabs: **Business** (identity, logo, signature), **Rates**, **Taxes**, **Numbering**,
+**Categories** (plus payment methods), **Google Drive**. The tabbed panels share one Save button; the managed lists — staff tiers,
 client categories, expense categories — are rows that save as you edit them.
 
 **Rates.** One row per staff tier, each with its own hourly rate. The tier marked

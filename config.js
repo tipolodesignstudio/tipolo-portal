@@ -12,3 +12,8 @@ export const ALLOWED_EMAIL_DOMAIN = "tipolo.ca";
 // Get one at hcaptcha.com; the paired SECRET key goes in Supabase
 // (Authentication → Attack Protection → Captcha → hCaptcha).
 export const HCAPTCHA_SITE_KEY = "YOUR-HCAPTCHA-SITE-KEY";
+
+// Google OAuth client ID (public) for saving receipts and the Income & Expense Tracker
+// to Google Drive. SETUP.md → "Google Drive" has the click-path. Leave as-is to turn
+// the Drive features off.
+export const GOOGLE_CLIENT_ID = "YOUR-GOOGLE-CLIENT-ID";

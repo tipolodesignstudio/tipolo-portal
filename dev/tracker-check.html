@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Tracker workbook check</title>
+<!-- Reads a tracker workbook and writes it back with test rows. Point ?file= at a
+     local copy (dev/_local-*.xlsx is git-ignored). window.__out holds the result as
+     base64 for inspection. -->
+<body style="font:14px system-ui;padding:20px">
+<pre id="log">running…</pre>
+<script type="module">
+import { readTracker, writeTracker, toSerial } from "../js/core/tracker-xlsx.js";
+const log = (x) => (document.getElementById("log").textContent += "\n" + x);
+const file = new URLSearchParams(location.search).get("file") || "_local-tracker.xlsx";
+const n = Number(new URLSearchParams(location.search).get("rows") || 12);
+try {
+  const buf = await (await fetch(file)).arrayBuffer();
+  const before = await readTracker(buf);
+  window.__before = before;
+  log(`read: ${before.expenses.length} expenses, ${before.income.length} income, ${before.fixed.length} fixed`);
+
+  const cats = ["Permits & Licenses", "Marketing", "Equipment & Tools", "Office Supplies"];
+  const expenses = Array.from({ length: n }, (_, i) => ({
+    "Date": { serial: toSerial(`2026-09-${String((i % 28) + 1).padStart(2, "0")}`) },
+    "Description": `Test expense ${i + 1} — $1 & <b> "quoted"`,
+    "Client / Project": i % 3 ? "N/A" : "26102 ConnectLA Website",
+    "Amount": 10 + i,
+    "Category": cats[i % cats.length],
+    "Payment Method": "Tipolo Credit Card",
+  }));
+  const income = [{ "Date": { serial: toSerial("2026-09-10") }, "Client / Project": "Connect Landscape Architecture",
+    "Description": "Task 1", "Amount": 970, "Payment Method": "Cheque", "Invoice #": "26102-001" }];
+  const fixed = [
+    { item: "Business Insurance", category: "Insurance", annual_cost: 1150, notes: "PLI" },
+    { item: "Brand new item", category: "Other", annual_cost: 99.5, notes: "" },
+  ];
+  const total = expenses.reduce((s, e) => s + e.Amount, 0);
+  const summary = { "all time": total, "total expenses": total, "total income": 970, "net": 970 - total, "marketing": 42 };
+  const blob = await writeTracker(buf, { expenses, income, fixed, summary,
+    lists: { categories: [...cats, "Other", "Insurance"], expensePayment: ["Tipolo Credit Card", "Cash"], incomePayment: ["Cheque"] } });
+  const out = await blob.arrayBuffer();
+  const after = await readTracker(out);
+  window.__after = after;
+  log(`wrote ${out.byteLength} bytes; re-read: ${after.expenses.length} expenses, ${after.income.length} income, ${after.fixed.length} fixed`);
+  log(`first: ${JSON.stringify(after.expenses[0])}`);
+  log(`last: ${JSON.stringify(after.expenses.at(-1))}`);
+  log(`fixed: ${JSON.stringify(after.fixed)}`);
+  let bin = ""; const u8 = new Uint8Array(out);
+  for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  window.__out = btoa(bin);
+  log("OK");
+} catch (err) { log("ERROR " + err.stack); }
+</script>
+</body>

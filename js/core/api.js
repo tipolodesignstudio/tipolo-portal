@@ -664,12 +664,12 @@ export async function deleteExpense(id) {
 // unbilled billable expenses for ONE project -> invoice line items (amount + markup)
 export async function buildExpenseLineItems(projectId) {
   const rows = unwrap(await supabase.from("expenses")
-    .select("id, vendor, notes, amount, markup_pct, category:category_id(name)")
+    .select("id, description, vendor, notes, amount, markup_pct, category:category_id(name)")
     .eq("project_id", projectId).eq("billable", true).is("invoice_id", null));
   return {
     lineItems: rows.map((e) => {
       const unit = round2(Number(e.amount || 0) * (1 + (Number(e.markup_pct) || 0) / 100));
-      const label = [e.vendor, e.category?.name].filter(Boolean).join(" · ") || e.notes || "Expense";
+      const label = [e.description || e.vendor, e.category?.name].filter(Boolean).join(" · ") || e.notes || "Expense";
       return {
         description: `${label}${e.markup_pct ? ` (+${e.markup_pct}%)` : ""}`,
         qty: 1, unit_price: unit, kind: "expense", source_expense_ids: [e.id],
@@ -711,6 +711,77 @@ export async function receiptUrl(pathOrUrl) {
   const { data, error } = await supabase.storage.from("receipts").createSignedUrl(path, 3600);
   if (error) throw new Error(error.message);
   return data.signedUrl;
+}
+
+/* ---------------- income ---------------- */
+
+const INCOME_SELECT =
+  "*, client:client_id(id, name, company), project:project_id(id, number, title), invoice:invoice_id(id, number)";
+
+export async function listIncome({ from, to } = {}) {
+  let q = supabase.from("income").select(INCOME_SELECT)
+    .order("income_date", { ascending: false }).order("created_at", { ascending: false });
+  if (from) q = q.gte("income_date", from);
+  if (to) q = q.lte("income_date", to);
+  return unwrap(await q);
+}
+export async function createIncome(patch) {
+  return unwrap(await supabase.from("income").insert(patch).select(INCOME_SELECT).single());
+}
+export async function updateIncome(id, patch) {
+  return unwrap(await supabase.from("income").update(patch).eq("id", id).select(INCOME_SELECT).single());
+}
+export async function deleteIncome(id) {
+  const { error } = await supabase.from("income").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+// every client, the studio's own included — income can come from anywhere
+export async function listAllClients() {
+  return unwrap(await supabase.from("clients").select("id, name, company, is_internal").order("name"));
+}
+
+export async function invoicesByNumber(numbers) {
+  if (!numbers.length) return [];
+  return unwrap(await supabase.from("invoices")
+    .select("id, number, project_id, total, project:project_id(client_id)").in("number", numbers));
+}
+
+/* ---------------- fixed costs ---------------- */
+
+export async function listFixedCosts() {
+  return unwrap(await supabase.from("fixed_costs")
+    .select("*, category:category_id(id, name)").order("sort_order").order("created_at"));
+}
+export async function createFixedCost(patch) {
+  const { data: max } = await supabase.from("fixed_costs")
+    .select("sort_order").order("sort_order", { ascending: false }).limit(1);
+  const sort_order = (max?.[0]?.sort_order ?? 0) + 1;
+  return unwrap(await supabase.from("fixed_costs").insert({ sort_order, ...patch })
+    .select("*, category:category_id(id, name)").single());
+}
+export async function updateFixedCost(id, patch) {
+  return unwrap(await supabase.from("fixed_costs").update(patch).eq("id", id)
+    .select("*, category:category_id(id, name)").single());
+}
+export async function deleteFixedCost(id) {
+  const { error } = await supabase.from("fixed_costs").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/* ---------------- tracker sync state ---------------- */
+
+// Only these columns; saveSettings() would drag the whole form along.
+export async function booksState() {
+  const { data, error } = await supabase.from("app_settings")
+    .select("books_changed_at, tracker_synced_at, drive_folder_id, drive_receipts_folder_id, drive_tracker_file_id, expense_payment_methods, income_payment_methods")
+    .eq("id", 1).maybeSingle();
+  if (error) throw new Error(/does not exist/.test(error.message)
+    ? "The books need migration 0025 run in Supabase first." : error.message);
+  return data || {};
+}
+export async function setBooksState(patch) {
+  return unwrap(await supabase.from("app_settings").update(patch).eq("id", 1).select().single());
 }
 
 /* ---------------- proposal source PDFs ---------------- */

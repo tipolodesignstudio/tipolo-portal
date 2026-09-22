@@ -1,4 +1,5 @@
 // Bootstrap: config check -> session gate -> shell + router, reacting to auth changes.
+import { setLoginHint } from "./core/gdrive.js";
 import { supabase, CONFIG_OK } from "./core/supabase.js";
 import { defineRoutes, startRouter } from "./core/router.js";
 import { renderShell } from "./components/layout.js";
@@ -51,6 +52,7 @@ async function showApp(session) {
   if (mode === "app" && shell) return; // already mounted
   mode = "app";
   shell = renderShell(app, { email: session.user?.email });
+  setLoginHint(session.user?.email);
 
   // route context helpers piggyback on the shell
   const origDefine = ROUTES.map((r) => ({

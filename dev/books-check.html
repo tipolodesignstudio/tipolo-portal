@@ -1,0 +1,165 @@
+<!doctype html>
+<meta charset="utf-8"><title>books check</title>
+<!--
+  Mounts Income & Expenses against a stubbed database AND a stubbed Google Drive, so
+  receipts, the Excel sync and the import can be exercised end to end offline.
+  The Drive holds ?tracker= (default _local-tracker.xlsx, git-ignored) as the workbook.
+  ?linked=0 starts with Drive not linked. window.__drive / window.__db to inspect.
+  Nothing here ships with the app.
+-->
+<script type="importmap">
+  { "imports": { "/config.js": "/dev/books-config.js" } }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<style>body{margin:0;background:var(--bg,#F5F2E9)} #app{max-width:1100px;margin:0 auto;padding:24px}
+  #err{position:fixed;bottom:0;left:0;right:0;z-index:99;background:#F5E3DC;color:#B3341C;
+       font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;padding:8px}</style>
+<div id="app"></div>
+<div id="err" hidden></div>
+<script type="module">
+  const err = document.getElementById("err");
+  const fail = (m) => { err.hidden = false; err.textContent += m + "\n"; };
+  window.addEventListener("error", (e) => fail(e.message));
+  window.addEventListener("unhandledrejection", (e) => fail(String(e.reason?.stack || e.reason)));
+  const P = new URLSearchParams(location.search);
+
+  /* ---- database ---- */
+  const cats = ["Permits & Licenses", "Payroll", "Employee Benefit", "Equipment & Tools", "Software & Subscription",
+    "Marketing", "Vehicle & Travel", "Office Supplies", "Client Entertainment", "Membership & Professional Fees",
+    "Rent & Utilities", "Insurance", "Other"].map((name, i) => ({ id: "cat" + i, name, sort_order: i }));
+  const db = {
+    app_settings: {
+      id: 1, expense_payment_methods: ["Tipolo Credit Card", "Personal Credit Card", "Cash", "E-transfer", "Cheque"],
+      income_payment_methods: ["Business card", "Personal card", "Cash", "E-transfer", "Cheque"],
+      drive_folder_id: P.get("linked") === "0" ? null : "ACCT",
+      drive_receipts_folder_id: P.get("linked") === "0" ? null : "RCPT",
+      drive_tracker_file_id: P.get("linked") === "0" ? null : "TRACKER",
+      books_changed_at: new Date().toISOString(), tracker_synced_at: null,
+    },
+    expense_categories: cats,
+    projects: [{ id: "p1", number: "26102", title: "ConnectLA Website", status: "active", client_id: "c1" }],
+    clients: [{ id: "c1", name: "Connect Landscape Architecture", company: null, is_internal: false }],
+    invoices: [{ id: "i1", number: "26102-001", project_id: "p1", total: 970 }],
+    expenses: [], income: [], fixed_costs: [],
+  };
+  window.__db = db;
+  const touch = () => { db.app_settings.books_changed_at = new Date(Date.now() + 5).toISOString(); };
+  const join = (t, r) => {
+    const by = (tab, id) => db[tab].find((x) => x.id === id) || null;
+    if (t === "expenses") return { ...r, category: by("expense_categories", r.category_id), project: by("projects", r.project_id) };
+    if (t === "income") return { ...r, client: by("clients", r.client_id), project: by("projects", r.project_id), invoice: by("invoices", r.invoice_id) };
+    if (t === "fixed_costs") return { ...r, category: by("expense_categories", r.category_id) };
+    if (t === "invoices") return { ...r, project: { client_id: by("projects", r.project_id)?.client_id } };
+    if (t === "projects") return { ...r, client: by("clients", r.client_id) };
+    return r;
+  };
+
+  /* ---- Google Drive ---- */
+  const drive = {
+    ACCT: { id: "ACCT", name: "Accounting", mimeType: "application/vnd.google-apps.folder", parents: ["ROOT"] },
+    RCPT: { id: "RCPT", name: "Receipts", mimeType: "application/vnd.google-apps.folder", parents: ["ACCT"] },
+    TRACKER: { id: "TRACKER", name: "Tipolo Income & Expense Tracker.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", parents: ["ACCT"],
+               blob: await (await fetch(P.get("tracker") || "_local-tracker.xlsx")).blob() },
+  };
+  window.__drive = drive;
+  window.__driveLog = [];
+  const meta = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, webViewLink: `https://drive.google.com/file/d/${f.id}/view` });
+  let seq = 0;
+  const nid = () => "F" + (++seq);
+
+  const real = window.fetch.bind(window);
+  const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json" } });
+
+  window.fetch = async (input, init = {}) => {
+    const url = typeof input === "string" ? input : input.url;
+    const method = (init.method || "GET").toUpperCase();
+
+    if (url.startsWith("https://www.googleapis.com/")) {
+      const u = new URL(url);
+      window.__driveLog.push(method + " " + u.pathname + " " + (u.searchParams.get("q") || u.searchParams.get("uploadType") || ""));
+      if (!/^Bearer /.test(init.headers?.Authorization || "")) return json({ error: { message: "no auth" } }, 401);
+      const idm = /\/files\/([^/?]+)/.exec(u.pathname);
+      const id = idm && decodeURIComponent(idm[1]);
+      if (u.pathname.startsWith("/upload/")) {
+        if (method === "PATCH") { drive[id].blob = init.body; drive[id].modified = Date.now(); return json(meta(drive[id])); }
+        const text = await init.body.text();
+        const m = JSON.parse(/\r\n\r\n(\{.*?\})\r\n/s.exec(text)[1]);
+        const parts = await init.body.arrayBuffer();
+        const f = { id: nid(), name: m.name, parents: m.parents, mimeType: "application/pdf", blob: new Blob([parts]) };
+        drive[f.id] = f; return json(meta(f));
+      }
+      if (id && u.pathname.endsWith("/copy")) {
+        const b = JSON.parse(init.body); const f = { ...drive[id], id: nid(), name: b.name, parents: b.parents };
+        drive[f.id] = f; return json(meta(f));
+      }
+      if (id && method === "GET" && u.searchParams.get("alt") === "media") return new Response(drive[id].blob);
+      if (id && method === "GET") return drive[id] ? json(meta(drive[id])) : json({ error: { message: "nf" } }, 404);
+      if (id && method === "PATCH") {
+        const f = drive[id]; const b = JSON.parse(init.body || "{}");
+        if (b.name) f.name = b.name;
+        const add = u.searchParams.get("addParents"), rem = u.searchParams.get("removeParents");
+        if (add) f.parents = [...f.parents.filter((p) => p !== rem), add];
+        return json(meta(f));
+      }
+      if (!id && method === "POST") {
+        const b = JSON.parse(init.body); const f = { id: nid(), ...b };
+        drive[f.id] = f; return json(meta(f));
+      }
+      if (!id && method === "GET") {
+        const q = u.searchParams.get("q");
+        const parent = /'([^']+)' in parents/.exec(q)[1];
+        const name = /name = '((?:[^'\\]|\\.)*)'/.exec(q)?.[1]?.replace(/\\(.)/g, "$1");
+        const folders = /mimeType = 'application\/vnd.google-apps.folder'/.test(q);
+        const files = Object.values(drive).filter((f) => f.parents?.includes(parent) && (!name || f.name === name)
+          && (!folders || f.mimeType === "application/vnd.google-apps.folder")).map(meta);
+        return json({ files });
+      }
+      return json({ error: { message: "unhandled " + method + " " + url } }, 400);
+    }
+
+    if (!url.includes("/rest/v1/")) return real(input, init);
+    const t = (url.match(/\/rest\/v1\/([a-z_]+)/) || [])[1];
+    const body = init.body ? JSON.parse(init.body) : null;
+    if (t === "app_settings") {
+      if (method !== "GET") Object.assign(db.app_settings, body);
+      return json(db.app_settings);
+    }
+    const rows = db[t];
+    if (!rows) return json([]);
+    const single = /vnd\.pgrst\.object/.test(new Headers(init.headers || {}).get("accept") || "");
+    const idEq = url.match(/[?&]id=eq\.([^&]+)/)?.[1];
+    if (method === "GET") {
+      let out = rows;
+      const num = url.match(/number=in\.\(([^)]*)\)/);
+      if (num) { const want = decodeURIComponent(num[1]).split(",").map((s) => s.replace(/"/g, "")); out = rows.filter((r) => want.includes(r.number)); }
+      out = out.map((r) => join(t, r));
+      return json(single ? out[0] : out);
+    }
+    if (method === "POST") {
+      const row = { id: t.slice(0, 3) + Math.random().toString(36).slice(2, 6), created_at: new Date().toISOString(), ...body };
+      rows.push(row); if (t !== "expense_categories") touch();
+      return json(single ? join(t, row) : [join(t, row)]);
+    }
+    if (method === "PATCH") {
+      const row = rows.find((r) => r.id === idEq);
+      Object.assign(row, body); touch();
+      return json(single ? join(t, row) : [join(t, row)]);
+    }
+    if (method === "DELETE") {
+      const i = rows.findIndex((r) => r.id === idEq);
+      if (i >= 0) rows.splice(i, 1); touch();
+      return json([]);
+    }
+    return json([]);
+  };
+
+  // pretend Google already handed over a token for this tab
+  if (P.get("connected") !== "0") {
+    sessionStorage.setItem("tipolo.gdrive.token", JSON.stringify({ access: "test-token", exp: Date.now() + 3600e3 }));
+  } else sessionStorage.removeItem("tipolo.gdrive.token");
+
+  const { render } = await import(P.get("view") === "settings" ? "../js/views/settings.js" : "../js/views/expenses.js");
+  await render(document.getElementById("app"), { setCrumbs() {} });
+  window.__ready = true;
+</script>

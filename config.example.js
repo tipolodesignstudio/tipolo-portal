@@ -13,3 +13,8 @@ export const ALLOWED_EMAIL_DOMAIN = "tipolo.ca";
 
 // hCaptcha site key (public). Leave the placeholder to disable the captcha widget.
 export const HCAPTCHA_SITE_KEY = "YOUR-HCAPTCHA-SITE-KEY";
+
+// Google OAuth client ID (public) for saving receipts and the Income & Expense Tracker
+// to Google Drive. SETUP.md → "Google Drive" has the click-path. Leave as-is to turn
+// the Drive features off.
+export const GOOGLE_CLIENT_ID = "YOUR-GOOGLE-CLIENT-ID";

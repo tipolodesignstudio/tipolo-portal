@@ -11,7 +11,10 @@ import {
   listStaffTiers, createStaffTier, updateStaffTier, deleteStaffTier, setDefaultStaffTier,
   listCategories, createCategory, updateCategory, deleteCategory,
   listExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
+  setBooksState,
 } from "../core/api.js";
+import * as drive from "../core/gdrive.js";
+import { linkDrive, TRACKER_NAME } from "../core/books.js";
 import { confirmModal } from "../components/modal.js";
 import { toastOk, toastErr } from "../components/toast.js";
 
@@ -21,7 +24,10 @@ const TABS = [
   { id: "taxes", label: "Taxes" },
   { id: "numbering", label: "Numbering" },
   { id: "categories", label: "Categories" },
+  { id: "drive", label: "Google Drive" },
 ];
+// tabs made of lists that save themselves — the Save button has nothing to do there
+const SELF_SAVING = ["categories", "drive"];
 const TAB_KEY = "tipolo.settings.tab";
 
 let taxLines = [];
@@ -218,6 +224,26 @@ export async function render(root, ctx) {
             <button type="button" class="btn subtle sm" id="ecat-add">Add</button>
           </div>
         </div>
+
+        <div class="card">
+          <h2>Payment methods</h2>
+          <div class="muted" style="margin-bottom:10px">
+            The choices on an expense or a payment, and the dropdowns in the Excel tracker.</div>
+          <div class="form-grid cols-2">
+            <div><div class="lbl">Expenses</div><div id="pm-expense"></div></div>
+            <div><div class="lbl">Income</div><div id="pm-income"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div data-panel="drive" class="stack">
+        <div class="card">
+          <h2>Google Drive</h2>
+          <div class="muted" style="margin-bottom:12px">
+            Receipts are filed in the Accounting folder, and the ${escapeHtml(TRACKER_NAME)}
+            there is rewritten after every change to the books.</div>
+          <div id="drive-panel"></div>
+        </div>
       </div>
 
       <div class="cluster" id="save-bar">
@@ -235,7 +261,7 @@ export async function render(root, ctx) {
     root.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("active", b.dataset.tab === id));
     root.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== id; });
     // The lists save themselves, so the Save button has nothing to do on that tab.
-    root.querySelector("#save-bar").hidden = id === "categories";
+    root.querySelector("#save-bar").hidden = SELF_SAVING.includes(id);
   }
   on(root, "click", "[data-tab]", (e, btn) => showTab(btn.dataset.tab));
   showTab(tab);
@@ -287,6 +313,13 @@ export async function render(root, ctx) {
     columns: (c) => `<input data-ecat-field="name" value="${escapeHtml(c.name || "")}"
       placeholder="Category name" style="flex:1;min-width:160px" />`,
   });
+
+  /* ---- payment methods (plain lists on app_settings) ---- */
+  stringList(root, "#pm-expense", s, "expense_payment_methods");
+  stringList(root, "#pm-income", s, "income_payment_methods");
+
+  /* ---- Google Drive ---- */
+  drivePanel(root.querySelector("#drive-panel"), s);
 
   /* ---- the worked example under "length of a day" ---- */
   function refreshDayExample() {
@@ -393,6 +426,111 @@ export async function render(root, ctx) {
       toastErr("Save failed: " + err.message);
     } finally { btn.disabled = false; }
   });
+}
+
+/* A list of plain names kept on app_settings — one input per entry, saved as you
+   leave it. Emptying an entry removes it. */
+function stringList(root, sel, s, key) {
+  const host = root.querySelector(sel);
+  let items = Array.isArray(s[key]) ? [...s[key]] : [];
+  const paint = () => {
+    host.innerHTML = `<div class="list-rows">${items.map((v, i) => `
+        <div class="list-row"><input data-sl="${i}" value="${escapeHtml(v)}" style="flex:1" />
+          <button type="button" class="icon-btn" data-sl-del="${i}" title="Delete">✕</button></div>`).join("")}
+        <div class="list-row"><input data-sl-new placeholder="Add…" style="flex:1" /></div></div>`;
+  };
+  const save = async (next) => {
+    const clean = [...new Set(next.map((v) => v.trim()).filter(Boolean))];
+    if (JSON.stringify(clean) === JSON.stringify(items)) { paint(); return; }
+    try { await setBooksState({ [key]: clean }); items = clean; }
+    catch (err) { toastErr(/column/.test(err.message) ? "Run migration 0025 in Supabase first." : err.message); }
+    paint();
+  };
+  host.addEventListener("focusout", (e) => {
+    const el = e.target;
+    if (el.dataset.sl != null) { const next = [...items]; next[+el.dataset.sl] = el.value; save(next); }
+    else if (el.hasAttribute("data-sl-new") && el.value.trim()) save([...items, el.value]);
+  });
+  host.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); e.target.blur(); } });
+  host.addEventListener("click", (e) => {
+    const del = e.target.closest("[data-sl-del]");
+    if (del) save(items.filter((_, i) => i !== +del.dataset.slDel));
+  });
+  paint();
+}
+
+/* Connect this browser to Google, and point the portal at the Accounting folder. */
+function drivePanel(host, s) {
+  let st = { drive_folder_id: s.drive_folder_id, drive_receipts_folder_id: s.drive_receipts_folder_id,
+             drive_tracker_file_id: s.drive_tracker_file_id };
+  let names = null;
+
+  async function paint() {
+    if (!drive.configured()) {
+      host.innerHTML = `<div class="alert info">Google Drive isn't switched on yet. It needs a Google
+        OAuth client ID in <code>config.js</code> — SETUP.md → “Google Drive” has the steps.</div>`;
+      return;
+    }
+    drive.loadGoogle().catch(() => {});
+    const on = drive.connected();
+    if (on && st.drive_folder_id && !names) {
+      try {
+        const [f, r, t] = await Promise.all([st.drive_folder_id, st.drive_receipts_folder_id, st.drive_tracker_file_id]
+          .map((id) => (id ? drive.getFile(id) : null)));
+        names = { folder: f?.name, receipts: r?.name, tracker: t?.name, link: f?.webViewLink, tlink: t?.webViewLink };
+      } catch (err) { names = { error: err.message }; }
+    }
+    host.innerHTML = `
+      <div class="stack">
+        <div class="cluster">
+          <span class="badge ${on ? "green" : "grey"}">${on ? "Connected" : "Not connected"}</span>
+          ${on ? `<button type="button" class="btn link sm" data-drive-off>disconnect</button>`
+               : `<button type="button" class="btn subtle sm" data-drive-on>Connect Google Drive</button>`}
+          <span class="faint" style="font-size:.85rem">Each person connects once per browser session.</span>
+        </div>
+        <div>
+          <div class="lbl">Accounting folder</div>
+          ${st.drive_folder_id ? `
+            <div style="margin:4px 0 10px">
+              ${names?.error ? `<span class="alert error" style="display:block">${escapeHtml(names.error)}</span>`
+                : names ? `<a href="${escapeHtml(names.link || "#")}" target="_blank" rel="noopener">${escapeHtml(names.folder || "")}</a>
+                    <span class="faint"> · receipts in ${escapeHtml(names.receipts || "Receipts")}
+                    · tracker <a href="${escapeHtml(names.tlink || "#")}" target="_blank" rel="noopener">${escapeHtml(names.tracker || "")}</a></span>`
+                : `<span class="faint">Linked. Connect to see the folder.</span>`}
+            </div>` : `<div class="faint" style="margin:4px 0 10px">Not linked yet.</div>`}
+          <div class="cluster">
+            <input type="text" id="drive-link" placeholder="https://drive.google.com/drive/folders/…" style="flex:1;min-width:260px" />
+            <button type="button" class="btn subtle sm" data-drive-link ${on ? "" : "disabled"}>${st.drive_folder_id ? "Re-link" : "Link folder"}</button>
+          </div>
+          <div class="hint">Open 01_Admin → Accounting in Google Drive and copy its link from the address bar.
+            The first time, a copy of the tracker is saved alongside it as “(before portal)”.</div>
+        </div>
+      </div>`;
+  }
+
+  // Enter in the link box links it, rather than submitting the settings form around it
+  host.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.id === "drive-link") { e.preventDefault(); host.querySelector("[data-drive-link]")?.click(); }
+  });
+  host.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-drive-on]")) {
+      drive.connect().then(() => { names = null; paint(); }).catch((err) => toastErr(err.message));
+    }
+    if (e.target.closest("[data-drive-off]")) { drive.disconnect(); paint(); }
+    const linkBtn = e.target.closest("[data-drive-link]");
+    if (linkBtn) {
+      const link = host.querySelector("#drive-link").value;
+      linkBtn.disabled = true; linkBtn.innerHTML = `<span class="spinner"></span>`;
+      try {
+        const res = await linkDrive(link);
+        st = { drive_folder_id: res.folder.id, drive_receipts_folder_id: res.receipts.id, drive_tracker_file_id: res.tracker.id };
+        names = null;
+        toastOk(`Linked ${res.folder.name}`);
+      } catch (err) { toastErr(err.message); }
+      paint();
+    }
+  });
+  paint();
 }
 
 /* A managed list that saves as you edit it: type in a cell, and the row is written when
