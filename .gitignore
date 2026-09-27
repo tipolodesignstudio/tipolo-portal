@@ -6,3 +6,7 @@ node_modules/
 
 # Real client documents used for local parser checks — never publish these
 dev/_local-*
+
+# Business/brand context written by the Small Business plugin. Holds client
+# names, fees and invoice status — this repo is public, so it stays local.
+CLAUDE.md
