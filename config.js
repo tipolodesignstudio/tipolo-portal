@@ -16,4 +16,4 @@ export const HCAPTCHA_SITE_KEY = "YOUR-HCAPTCHA-SITE-KEY";
 // Google OAuth client ID (public) for saving receipts and the Income & Expense Tracker
 // to Google Drive. SETUP.md → "Google Drive" has the click-path. Leave as-is to turn
 // the Drive features off.
-export const GOOGLE_CLIENT_ID = "YOUR-GOOGLE-CLIENT-ID";
+export const GOOGLE_CLIENT_ID = "533745129472-g6ocfsloq393arbaehufvj8l5o69ejiu.apps.googleusercontent.com";
