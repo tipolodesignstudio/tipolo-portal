@@ -1,0 +1,139 @@
+<!doctype html>
+<meta charset="utf-8"><title>drive import check</title>
+<!--
+  Mounts Proposals → From Drive against a stubbed database and a stubbed Google Drive
+  laid out like the studio's own: 05_Proposals / 06_Projects folders named by job
+  number, with proposal and invoice PDFs inside. The PDF served for every proposal is
+  ?pdf= (default sample-proposal.pdf, or _local-*.pdf which is git-ignored).
+  ?folders=0 starts with the folders unlinked. window.__db / window.__drive to inspect.
+  Nothing here ships with the app.
+-->
+<script type="importmap">
+  { "imports": { "/config.js": "/dev/books-config.js" } }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/app.css">
+<style>body{margin:0;background:var(--bg,#F5F2E9)} #app{max-width:1100px;margin:0 auto;padding:24px}
+  #err{position:fixed;bottom:0;left:0;right:0;z-index:99;background:#F5E3DC;color:#B3341C;
+       font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;padding:8px}</style>
+<div id="app"></div>
+<div id="err" hidden></div>
+<script type="module">
+  const err = document.getElementById("err");
+  const fail = (m) => { err.hidden = false; err.textContent += m + "\n"; };
+  window.addEventListener("error", (e) => fail(e.message));
+  window.addEventListener("unhandledrejection", (e) => fail(String(e.reason?.stack || e.reason)));
+  const P = new URLSearchParams(location.search);
+
+  const pdfBlob = await (await fetch(P.get("pdf") || "sample-proposal.pdf")).blob();
+
+  /* ---- database ---- */
+  const db = {
+    app_settings: {
+      id: 1, business_name: "Tipolo Design Studio",
+      drive_proposals_folder_id: P.get("folders") === "0" ? null : "PROPOSALSFOLDER1",
+      drive_projects_folder_id: P.get("folders") === "0" ? null : "PROJECTSFOLDER1",
+      books_changed_at: new Date().toISOString(), tracker_synced_at: null,
+      tax_lines: [], job_seq_year: 2026, job_seq_next: 104, job_seq_start: 101,
+    },
+    staff_tiers: [],
+    clients: [{ id: "c1", name: "Connect Landscape Architecture", status: "active" }],
+    // 26102 is already in the portal; 26101 and 26103 are not
+    proposals: [{ id: "pr1", number: "26102", title: "Website Redesign", status: "accepted", client_id: "c1" }],
+    projects: [{ id: "pj1", number: "26102", title: "ConnectLA Website", status: "active", client_id: "c1" }],
+    invoices: [{ id: "i1", number: "26102-001", project_id: "pj1", status: "paid", total: 970 }],
+  };
+  window.__db = db;
+
+  /* ---- Drive, laid out like My Drive ---- */
+  const F = (id, name, parent) => ({ id, name, mimeType: "application/vnd.google-apps.folder", parents: [parent] });
+  const doc = (id, name, parent) => ({ id, name, mimeType: "application/pdf", parents: [parent], blob: pdfBlob });
+  const drive = {};
+  for (const f of [
+    F("PROPOSALSFOLDER1", "05_Proposals", "ROOT"), F("PROJECTSFOLDER1", "06_Projects", "ROOT"),
+    F("p23101", "23101 Riman Store Canada", "PROPOSALSFOLDER1"),
+    F("p26101", "26101 Mount Baker", "PROPOSALSFOLDER1"),
+    F("p26102", "26102 Connect LA Website", "PROPOSALSFOLDER1"),
+    F("p26103", "26103 26 Axford Bay Port Moody", "PROPOSALSFOLDER1"),
+    F("pres", "Presentation", "p26102"),
+    F("j26102", "26102_M ConnectLA Website", "PROJECTSFOLDER1"),
+    F("j22051", "22051_L Bayside_Rainbow Park Irrigation", "PROJECTSFOLDER1"),
+    F("adm", "00_Administrative", "j26102"), F("inv", "Invoice", "adm"),
+  ]) drive[f.id] = f;
+  for (const d of [
+    doc("d1", "23101 Riman Proposal.pdf", "p23101"),
+    doc("d2", "Marketing License Agreement_Mount Baker.pdf", "p26101"),
+    doc("d3", "26102 ConnectLA Proposal.pdf", "p26102"),
+    doc("d4", "26102 ConnectLA Proposal_Executed.pdf", "p26102"),
+    doc("d5", "26102 ConnectLA Proposal_Signed.pdf", "p26102"),
+    doc("d6", "26102 ConnectLA Website.pdf", "pres"),
+    doc("d7", "26103 Stone Bear_Axford Bay Proposal.pdf", "p26103"),
+    doc("d8", "GIS Information.pdf", "p26103"),
+    doc("d9", "Invoice_26102-001.pdf", "inv"),
+  ]) drive[d.id] = d;
+  window.__drive = drive;
+  window.__driveLog = [];
+
+  const meta = (f) => ({ id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents,
+                         webViewLink: `https://drive.google.com/file/d/${f.id}/view` });
+  const json = (b, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json" } });
+  const real = window.fetch.bind(window);
+  let seq = 0;
+
+  window.fetch = async (input, init = {}) => {
+    const url = typeof input === "string" ? input : input.url;
+    const method = (init.method || "GET").toUpperCase();
+
+    if (url.startsWith("https://www.googleapis.com/")) {
+      const u = new URL(url);
+      window.__driveLog.push(method + " " + u.pathname + " " + (u.searchParams.get("q") || ""));
+      const idm = /\/files\/([^/?]+)/.exec(u.pathname);
+      const id = idm && decodeURIComponent(idm[1]);
+      if (id && u.searchParams.get("alt") === "media") return new Response(drive[id].blob);
+      if (id && method === "GET") return drive[id] ? json(meta(drive[id])) : json({ error: { message: "nf" } }, 404);
+      if (!id && method === "GET") {
+        const q = u.searchParams.get("q");
+        const parent = /'([^']+)' in parents/.exec(q)[1];
+        const folders = /google-apps.folder/.test(q);
+        return json({ files: Object.values(drive)
+          .filter((f) => f.parents?.includes(parent) && (!folders || f.mimeType.includes("folder")))
+          .map(meta) });
+      }
+      return json({ error: { message: "unhandled " + method + " " + url } }, 400);
+    }
+
+    if (url.includes("/storage/v1/")) {           // the proposal-sources bucket
+      return json({ Key: "proposal-sources/src-" + (++seq) + ".pdf", path: "src-" + seq + ".pdf" });
+    }
+    if (!url.includes("/rest/v1/")) return real(input, init);
+
+    const t = (url.match(/\/rest\/v1\/([a-z_]+)/) || [])[1];
+    const body = init.body ? JSON.parse(init.body) : null;
+    const single = /vnd\.pgrst\.object/.test(new Headers(init.headers || {}).get("accept") || "");
+    if (t === "app_settings") { if (method !== "GET") Object.assign(db.app_settings, body); return json(db.app_settings); }
+    if (url.includes("/rpc/")) return json("26104");
+    const rows = db[t];
+    if (!rows) return json([]);
+    if (method === "GET") return json(single ? rows[0] : rows);
+    if (method === "POST") {
+      const row = { id: t.slice(0, 2) + (++seq), number: t === "proposals" ? "26104" : null,
+                    created_at: new Date().toISOString(), ...body };
+      rows.push(row);
+      return json(single ? row : [row]);
+    }
+    if (method === "PATCH") { const r = rows.find((x) => x.id === url.match(/id=eq\.([^&]+)/)?.[1]); Object.assign(r, body); return json(single ? r : [r]); }
+    return json([]);
+  };
+
+  sessionStorage.setItem("tipolo.gdrive.token", JSON.stringify({ access: "test-token", exp: Date.now() + 3600e3 }));
+  // a signed-in Supabase session, which the storage uploads check for
+  localStorage.setItem("tipolo-portal-auth", JSON.stringify({
+    access_token: "test", refresh_token: "test", token_type: "bearer",
+    expires_at: Math.floor(Date.now() / 1000) + 3600, expires_in: 3600,
+    user: { id: "u1", email: "portaltest@tipolo.ca", aud: "authenticated", role: "authenticated" },
+  }));
+
+  const { render } = await import(P.get("view") === "settings" ? "../js/views/settings.js" : "../js/views/drive-import.js");
+  await render(document.getElementById("app"), { setCrumbs() {}, navigate(p) { window.__navigated = p; } });
+  window.__ready = true;
+</script>

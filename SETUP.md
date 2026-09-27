@@ -47,6 +47,7 @@ That one file bundles every migration:
 | `0022_project_source_pdf.sql` | An imported proposal's PDF follows it into its project |
 | `0023_proposal_revisions.sql` | A hand-kept revision log on each proposal |
 | `0024_proposal_doc_mode.sql` | A proposal is either built here or is an attached PDF |
+| `0026_drive_folders.sql` | Remembers your 05_Proposals and 06_Projects folders, for Proposals → From Drive |
 | `0025_books.sql` | Income & Expense Tracker: income (paid invoices add themselves), fixed costs, Drive-filed receipts, the tracker's categories and payment methods |
 
 *(If you'd rather run them one at a time, the individual files are in
@@ -192,7 +193,15 @@ Drive directly, so it needs a Google OAuth client ID. Everything here is free.
    check the counts before you confirm. After that, add entries in the portal: the Excel file
    is rewritten from the portal, so anything typed straight into it gets replaced.
 
-### e. Staff
+### e. Import the back catalogue (optional)
+Settings → Google Drive also takes links to **05_Proposals** and **06_Projects**. With those
+set, **Proposals → From Drive** lists the folders next to what the portal already holds,
+matched on job number, and imports the ones that are missing — attaching each folder's
+proposal PDF and reading its fee schedule. An imported proposal keeps the number its
+folder carries, so the portal and your filing agree. Project folders and their invoices are
+listed for checking only; a project is still created by accepting a proposal and converting it.
+
+### f. Staff
 Each person connects Google once per browser session. They need edit access in Drive to
 the **Receipts** folder and to the **tracker file**. Share just those two (right-click →
 Share), not the whole Accounting folder, which also holds Tax Documents and Payments.

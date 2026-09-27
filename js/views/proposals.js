@@ -29,6 +29,7 @@ export async function render(root, ctx) {
       <div class="cluster">
         <a class="btn ghost" href="#/proposals/templates">Templates</a>
         <a class="btn ghost" href="#/proposals/import">Import PDF</a>
+        <a class="btn ghost" href="#/proposals/from-drive">From Drive</a>
         <button class="btn" data-new>+ New proposal</button>
       </div>
     </div>

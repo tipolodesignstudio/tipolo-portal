@@ -462,7 +462,9 @@ function stringList(root, sel, s, key) {
 /* Connect this browser to Google, and point the portal at the Accounting folder. */
 function drivePanel(host, s) {
   let st = { drive_folder_id: s.drive_folder_id, drive_receipts_folder_id: s.drive_receipts_folder_id,
-             drive_tracker_file_id: s.drive_tracker_file_id };
+             drive_tracker_file_id: s.drive_tracker_file_id,
+             drive_proposals_folder_id: s.drive_proposals_folder_id,
+             drive_projects_folder_id: s.drive_projects_folder_id };
   let names = null;
 
   async function paint() {
@@ -473,11 +475,13 @@ function drivePanel(host, s) {
     }
     drive.loadGoogle().catch(() => {});
     const on = drive.connected();
-    if (on && st.drive_folder_id && !names) {
+    if (on && (st.drive_folder_id || st.drive_proposals_folder_id) && !names) {
       try {
-        const [f, r, t] = await Promise.all([st.drive_folder_id, st.drive_receipts_folder_id, st.drive_tracker_file_id]
+        const [f, r, t, pr, pj] = await Promise.all([st.drive_folder_id, st.drive_receipts_folder_id,
+          st.drive_tracker_file_id, st.drive_proposals_folder_id, st.drive_projects_folder_id]
           .map((id) => (id ? drive.getFile(id) : null)));
-        names = { folder: f?.name, receipts: r?.name, tracker: t?.name, link: f?.webViewLink, tlink: t?.webViewLink };
+        names = { folder: f?.name, receipts: r?.name, tracker: t?.name, link: f?.webViewLink, tlink: t?.webViewLink,
+                  proposals: pr?.name, projects: pj?.name };
       } catch (err) { names = { error: err.message }; }
     }
     host.innerHTML = `
@@ -505,6 +509,18 @@ function drivePanel(host, s) {
           <div class="hint">Open 01_Admin → Accounting in Google Drive and copy its link from the address bar.
             The first time, a copy of the tracker is saved alongside it as “(before portal)”.</div>
         </div>
+        ${[["drive_proposals_folder_id", "05_Proposals folder", "proposals"],
+           ["drive_projects_folder_id", "06_Projects folder", "projects"]].map(([key, label, kind]) => `
+          <div>
+            <div class="lbl">${label}</div>
+            <div class="faint" style="margin:4px 0 8px;font-size:.85rem">${st[key]
+              ? `Linked${names?.[kind] ? ` — ${escapeHtml(names[kind])}` : ""}.`
+              : "Not linked. Needed for Proposals → From Drive."}</div>
+            <div class="cluster">
+              <input type="text" data-folder-box="${key}" placeholder="https://drive.google.com/drive/folders/…" style="flex:1;min-width:260px" />
+              <button type="button" class="btn subtle sm" data-folder-link="${key}" ${on ? "" : "disabled"}>${st[key] ? "Re-link" : "Link"}</button>
+            </div>
+          </div>`).join("")}
       </div>`;
   }
 
@@ -517,6 +533,24 @@ function drivePanel(host, s) {
       drive.connect().then(() => { names = null; paint(); }).catch((err) => toastErr(err.message));
     }
     if (e.target.closest("[data-drive-off]")) { drive.disconnect(); paint(); }
+    // 05_Proposals / 06_Projects: just an id to remember, nothing is created in them
+    const folderBtn = e.target.closest("[data-folder-link]");
+    if (folderBtn) {
+      const key = folderBtn.dataset.folderLink;
+      const id = drive.idFromLink(host.querySelector(`[data-folder-box="${key}"]`).value);
+      if (!id) return toastErr("Paste the link to that folder (or its ID).");
+      folderBtn.disabled = true;
+      try {
+        const folder = await drive.getFile(id);
+        if (folder.mimeType !== "application/vnd.google-apps.folder") throw new Error("That link is a file, not a folder.");
+        await setBooksState({ [key]: folder.id });
+        st[key] = folder.id;
+        names = null;
+        toastOk(`Linked ${folder.name}`);
+      } catch (err) { toastErr(err.message); }
+      paint();
+      return;
+    }
     const linkBtn = e.target.closest("[data-drive-link]");
     if (linkBtn) {
       const link = host.querySelector("#drive-link").value;

@@ -101,6 +101,17 @@ browser's own (`js/core/zip.js`), with no library.
 - Setup: SETUP.md §8. Harness: `dev/books-check.html` (stubbed database + stubbed Drive)
   and `dev/tracker-check.html` (workbook round trip).
 
+## Bringing Drive into the portal
+
+`05_Proposals` and `06_Projects` are named by job number, so **Proposals → From Drive**
+(`js/views/drive-import.js`, scanning in `js/core/drive-scan.js`) can line the folders up
+against the portal's own records and show what is missing. Importing one reads its PDF
+through the same path as the PDF import — the PDF becomes the proposal, and only the
+client and the fee schedule come across — and the proposal keeps the folder's number
+rather than drawing a new one (`reserveJobNumber()` then pushes the counter past it).
+Signed and executed copies win over drafts, and decks and site information are ignored.
+Projects and their invoices are listed for checking only. Harness: `dev/drive-import-check.html`.
+
 ## Settings
 
 Six tabs: **Business** (identity, logo, signature), **Rates**, **Taxes**, **Numbering**,

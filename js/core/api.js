@@ -774,7 +774,9 @@ export async function deleteFixedCost(id) {
 // Only these columns; saveSettings() would drag the whole form along.
 export async function booksState() {
   const { data, error } = await supabase.from("app_settings")
-    .select("books_changed_at, tracker_synced_at, drive_folder_id, drive_receipts_folder_id, drive_tracker_file_id, expense_payment_methods, income_payment_methods")
+    .select("books_changed_at, tracker_synced_at, drive_folder_id, drive_receipts_folder_id, " +
+            "drive_tracker_file_id, drive_proposals_folder_id, drive_projects_folder_id, " +
+            "expense_payment_methods, income_payment_methods")
     .eq("id", 1).maybeSingle();
   if (error) throw new Error(/does not exist/.test(error.message)
     ? "The books need migration 0025 run in Supabase first." : error.message);
@@ -879,6 +881,25 @@ export async function listProjectProposals(projectId) {
       .eq("converted_project_id", projectId).order("created_at")
   );
 }
+/* An imported job keeps the number its Drive folder already carries, so the portal and
+   the filing agree. The insert trigger only draws a new number when none is given —
+   this then pushes the counter past it, so the next new proposal can't collide. */
+export async function reserveJobNumber(number) {
+  const n = String(number || "");
+  if (!/^\d{5}$/.test(n)) return null;
+  const year = new Date().getFullYear();
+  if (n.slice(0, 2) !== String(year).slice(2)) return null;    // an older year, no counter to move
+  const { data } = await supabase.from("app_settings")
+    .select("job_seq_next, job_seq_year, job_seq_start").eq("id", 1).maybeSingle();
+  const start = Number(data?.job_seq_start) || 101;
+  const rolled = Number(data?.job_seq_year) !== year;
+  const next = rolled ? start : Math.max(Number(data?.job_seq_next) || start, start);
+  const seq = Number(n.slice(2));
+  if (seq < next) return null;
+  return unwrap(await supabase.from("app_settings")
+    .update({ job_seq_next: seq + 1, job_seq_year: year }).eq("id", 1).select().single());
+}
+
 export async function createProposal(patch) {
   return unwrap(await supabase.from("proposals").insert(patch).select(PROPOSAL_SELECT).single());
 }

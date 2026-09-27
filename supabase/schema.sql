@@ -1284,3 +1284,13 @@ create trigger fixed_costs_touch_books after insert or update or delete on publi
 drop trigger if exists expense_categories_touch_books on public.expense_categories;
 create trigger expense_categories_touch_books after insert or update or delete on public.expense_categories
   for each statement execute function public.touch_books();
+
+-- ===== 0026_drive_folders.sql =====
+-- 0026_drive_folders.sql
+-- Where the studio's own filing lives in Google Drive, so the portal can read
+-- 05_Proposals and 06_Projects and offer to bring what's there into the portal.
+-- Nothing is written to Drive by this: the importer only reads those folders.
+
+alter table public.app_settings
+  add column if not exists drive_proposals_folder_id text,   -- 05_Proposals
+  add column if not exists drive_projects_folder_id  text;   -- 06_Projects
