@@ -716,7 +716,7 @@ export async function receiptUrl(pathOrUrl) {
 /* ---------------- income ---------------- */
 
 const INCOME_SELECT =
-  "*, client:client_id(id, name, company), project:project_id(id, number, title), invoice:invoice_id(id, number)";
+  "*, client:client_id(id, name), project:project_id(id, number, title), invoice:invoice_id(id, number)";
 
 export async function listIncome({ from, to } = {}) {
   let q = supabase.from("income").select(INCOME_SELECT)
@@ -738,7 +738,7 @@ export async function deleteIncome(id) {
 
 // every client, the studio's own included — income can come from anywhere
 export async function listAllClients() {
-  return unwrap(await supabase.from("clients").select("id, name, company, is_internal").order("name"));
+  return unwrap(await supabase.from("clients").select("id, name, is_internal").order("name"));
 }
 
 export async function invoicesByNumber(numbers) {

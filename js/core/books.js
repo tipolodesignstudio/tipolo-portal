@@ -210,7 +210,7 @@ export async function planImport(buffer) {
   };
   const findClient = (text) => {
     const t = norm(text);
-    return clients.find((c) => norm(c.name) === t || norm(c.company) === t)
+    return clients.find((c) => norm(c.name) === t)
       || clients.find((c) => t && (norm(c.name).includes(t) || t.includes(norm(c.name)))) || null;
   };
 
