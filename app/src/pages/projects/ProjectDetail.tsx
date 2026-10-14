@@ -11,7 +11,7 @@ import { Select } from "@/components/ui/fields";
 import { EmptyState } from "@/components/ui/data-table";
 import { useConfirm } from "@/components/ui/confirm";
 import { TimeEntryDialog } from "@/components/time/TimeEntryDialog";
-import { cn, legacy } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { date, hours, minutesToHM, money, STATUS } from "@/lib/format";
 import { settingsQuery } from "@/lib/data/settings";
 import { sourceUrl } from "@/lib/data/proposals";
@@ -22,6 +22,8 @@ import {
 import { BudgetBar } from "./ProjectsList";
 import { ProjectDialog } from "./ProjectDialog";
 import { NewInvoiceDialog } from "@/pages/invoices/InvoicesList";
+import { ExpenseDialog } from "@/pages/books/Dialogs";
+import { useQueryClient } from "@tanstack/react-query";
 
 const TABS = ["overview", "time", "expenses", "invoices", "proposals"] as const;
 type Tab = (typeof TABS)[number];
@@ -36,6 +38,8 @@ export function ProjectDetail() {
   const update = useUpdateProject();
   const [editing, setEditing] = React.useState(false);
   const [invoicing, setInvoicing] = React.useState(false);
+  const [expense, setExpense] = React.useState<{ id?: string } | null>(null);
+  const qc = useQueryClient();
 
   if (isLoading) return <div className="h-96 animate-pulse rounded-lg bg-card" />;
   if (error || !p) return <EmptyState title="Project not found">{(error as Error)?.message} <Link to="/projects" className="text-accent underline">Back to projects</Link></EmptyState>;
@@ -116,7 +120,7 @@ export function ProjectDetail() {
         <Card className="p-0">
           <div className="flex items-center justify-between px-5 pt-5">
             <CardTitle>Expenses</CardTitle>
-            <Button variant="outline" size="sm" asChild><a href={legacy("/expenses")}><Plus />Add in Income &amp; Expenses<ExternalLink /></a></Button>
+            <Button variant="outline" size="sm" onClick={() => setExpense({})}><Plus />Add expense</Button>
           </div>
           {work?.expenses.length ? (
             <ul className="mt-3 divide-y divide-border/70 border-t border-border/70">
@@ -177,6 +181,8 @@ export function ProjectDetail() {
 
       {editing && <ProjectDialog project={p} onClose={() => setEditing(false)} />}
       {invoicing && <NewInvoiceDialog projectId={p.id} onClose={() => setInvoicing(false)} />}
+      {expense && <ExpenseDialog prefill={{ project_id: p.id }} onClose={() => setExpense(null)}
+        onSaved={() => { qc.invalidateQueries({ queryKey: ["projects"] }); qc.invalidateQueries({ queryKey: ["books"] }); }} />}
     </div>
   );
 }

@@ -78,7 +78,22 @@ const db: Record<string, Row[]> = {
     { id: "te8", project_id: "p2", entry_date: thisWeek(1), minutes: 30, billable: false, rate: 95, invoice_id: null, description: "Travel", created_by: "u-mock", created_at: ago(1) },
   ],
   expenses: [
-    { id: "ex1", project_id: "p1", expense_date: "2026-09-20", description: "Stock photography", amount: 64.5, category_id: "cat-co", billable: true, markup_pct: 10, invoice_id: null },
+    { id: "ex1", project_id: "p1", expense_date: "2026-09-20", description: "Stock photography", amount: 64.5, category_id: "ec-mk", billable: true, markup_pct: 10, invoice_id: null, payment_method: "Tipolo Credit Card", created_at: ago(24) },
+    { id: "ex2", project_id: null, expense_date: "2026-08-17", description: "BC Name Registry", amount: 31.5, category_id: "ec-pl", billable: false, markup_pct: 0, invoice_id: null, payment_method: "Personal Credit Card", created_at: ago(58), receipt_drive_url: "https://drive.google.com/file/d/abc/view", receipt_name: "26-08-17 BC Name Registry.pdf" },
+    { id: "ex3", project_id: null, expense_date: "2026-09-17", description: "Office Table", amount: 148.95, category_id: "ec-eq", billable: false, markup_pct: 0, invoice_id: null, payment_method: "Personal Credit Card", created_at: ago(27) },
+    { id: "ex4", project_id: null, expense_date: "2026-10-05", description: "Adobe Creative Cloud", amount: 91.69, category_id: "ec-sw", billable: false, markup_pct: 0, invoice_id: null, payment_method: "Tipolo Credit Card", created_at: ago(9) },
+  ],
+  expense_categories: [
+    { id: "ec-pl", name: "Permits & Licenses", sort_order: 1 }, { id: "ec-eq", name: "Equipment & Tools", sort_order: 4 },
+    { id: "ec-sw", name: "Software & Subscription", sort_order: 5 }, { id: "ec-mk", name: "Marketing", sort_order: 6 },
+    { id: "ec-in", name: "Insurance", sort_order: 12 }, { id: "ec-ot", name: "Other", sort_order: 99 },
+  ],
+  income: [
+    { id: "in1", income_date: "2026-09-20", client_id: "c1", project_id: "p1", invoice_id: "i1", description: "Task 1: Template exploration", amount: 970, payment_method: "Cheque", created_at: ago(24) },
+  ],
+  fixed_costs: [
+    { id: "fc1", item: "Business Insurance", category_id: "ec-in", annual_cost: 1150, notes: "PLI $1m/$1m ($650), CGI $1m ($500)", sort_order: 1, created_at: ago(30) },
+    { id: "fc2", item: "Software Subscriptions", category_id: "ec-sw", annual_cost: 4040, notes: "Vectorworks, SketchUp, Adobe CC, Claude", sort_order: 2, created_at: ago(30) },
   ],
   proposals: [
     { id: "pr1", client_id: "c1", number: "26102", title: "Website Redesign", subtotal: 4845, status: "accepted",
@@ -104,7 +119,10 @@ const db: Record<string, Row[]> = {
   app_settings: [{ id: "1", business_name: "Tipolo Design Studio", email: "hello@tipolo.ca", phone: "604.729.0597",
     address: "Port Moody, BC", hours_per_day: 8, currency: "CAD",
     tax_lines: [{ label: "GST", rate: 5, enabled: true }, { label: "PST", rate: 7, enabled: true }],
-    income_payment_methods: ["Business card", "E-transfer", "Cheque"] }],
+    income_payment_methods: ["Business card", "E-transfer", "Cheque"],
+    expense_payment_methods: ["Tipolo Credit Card", "Personal Credit Card", "Cash"],
+    drive_folder_id: "ACCTFOLDER01", drive_receipts_folder_id: "RCPTFOLDER01", drive_tracker_file_id: "TRACKERFILE1",
+    books_changed_at: ago(0), tracker_synced_at: ago(1) }],
   invoices: [
     { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970, subtotal: 970, issue_date: "2026-09-09", due_date: "2026-10-09",
       paid_date: "2026-09-20", created_at: ago(35), sections: defaultInvoiceSections(), apply_taxes: false,
@@ -145,7 +163,9 @@ const FK: Record<string, Record<string, { table: string; on: string; many?: bool
     client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" },
     contact: { table: "client_contacts", on: "contact_id" },
   },
-  expenses: { category: { table: "client_categories", on: "category_id" } },
+  expenses: { category: { table: "expense_categories", on: "category_id" }, project: { table: "projects", on: "project_id" } },
+  income: { client: { table: "clients", on: "client_id" }, project: { table: "projects", on: "project_id" }, invoice: { table: "invoices", on: "invoice_id" } },
+  fixed_costs: { category: { table: "expense_categories", on: "category_id" } },
   time_entries: { project: { table: "projects", on: "project_id" } },
   invoices: { project: { table: "projects", on: "project_id" } },
   proposals: {
@@ -209,7 +229,7 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
-  const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+  const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
   if (url.pathname.startsWith("/storage/v1/object/")) {           // uploads: accept and forget
     return json({ Key: url.pathname.split("/object/")[1], Id: uid() });
   }

@@ -52,7 +52,7 @@ function Builder({ inv, settings, previous }: { inv: Invoice; settings: { tax_li
   const confirm = useConfirm();
   const save = useInvoiceUpdate();
   const editable = inv.status === "draft";
-  const taxDefs = (settings.tax_lines as TaxDef[] | undefined) ?? [];
+  const taxDefs = React.useMemo(() => (settings.tax_lines as TaxDef[] | undefined) ?? [], [settings.tax_lines]);
 
   const [blocks, setBlocks] = React.useState<Block[]>(() => normaliseInvoiceSections(inv.sections));
   // An invoice drafted before the document format carries qty × price line items;
