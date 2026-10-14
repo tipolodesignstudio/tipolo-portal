@@ -9,7 +9,7 @@ import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
 } from "@/components/ui/command";
 
-type Hit = { id: string; label: string; sub?: string; path: string };
+type Hit = { id: string; label: string; sub?: string; path: string; inApp?: boolean };
 
 // PostgREST's or() filter treats commas and brackets as syntax.
 const clean = (s: string) => s.replace(/[,()*%]/g, " ").trim();
@@ -28,7 +28,7 @@ async function search(term: string) {
   const clientName = (r: { client?: unknown }) =>
     (Array.isArray(r.client) ? r.client[0]?.name : (r.client as { name?: string } | null)?.name) ?? "";
   return {
-    clients: (c.data ?? []).map((r): Hit => ({ id: r.id, label: r.name, path: `/clients/${r.id}` })),
+    clients: (c.data ?? []).map((r): Hit => ({ id: r.id, label: r.name, path: `/clients/${r.id}`, inApp: true })),
     projects: (p.data ?? []).map((r): Hit => ({
       id: r.id, label: `${r.number ?? ""} ${r.title}`.trim(), sub: clientName(r), path: `/projects/${r.id}` })),
     proposals: (pr.data ?? []).map((r): Hit => ({
@@ -45,7 +45,6 @@ export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChang
     const t = setTimeout(() => setDebounced(term), 180);
     return () => clearTimeout(t);
   }, [term]);
-  React.useEffect(() => { if (!open) setTerm(""); }, [open]);
 
   const { data, isFetching } = useQuery({
     queryKey: ["search", debounced],
@@ -54,10 +53,13 @@ export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChang
     placeholderData: (prev) => prev,
   });
 
+  // closing clears the search, so it opens empty next time
+  const setOpen = (v: boolean) => { if (!v) { setTerm(""); setDebounced(""); } onOpenChange(v); };
+
   const go = (item: { to?: string; legacy?: string; path?: string }) => {
-    onOpenChange(false);
+    setOpen(false);
     if (item.to) navigate({ to: item.to });
-    else window.location.href = legacy(item.legacy ?? item.path ?? "/");
+    else window.location.assign(legacy(item.legacy ?? item.path ?? "/"));
   };
 
   const pages = NAV.filter((n) => !term || n.label.toLowerCase().includes(term.toLowerCase()));
@@ -69,7 +71,7 @@ export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChang
   const searching = term.trim().length >= 2;
 
   return (
-    <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={false}>
+    <CommandDialog open={open} onOpenChange={setOpen} shouldFilter={false}>
       <CommandInput value={term} onValueChange={setTerm} placeholder="Search clients, projects, proposals, or jump to a page…" />
       <CommandList>
         {searching && !isFetching && groups.every(([, , hits]) => !hits.length) && !pages.length && (
@@ -78,7 +80,7 @@ export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChang
         {groups.map(([heading, Icon, hits]) => hits.length > 0 && (
           <CommandGroup key={heading} heading={heading}>
             {hits.map((h) => (
-              <CommandItem key={h.id} value={`${heading}-${h.id}`} onSelect={() => go({ path: h.path })}>
+              <CommandItem key={h.id} value={`${heading}-${h.id}`} onSelect={() => go(h.inApp ? { to: h.path } : { path: h.path })}>
                 <Icon />
                 <span className="truncate">{h.label}</span>
                 {h.sub && <span className="ml-auto truncate text-xs text-ink-faint">{h.sub}</span>}

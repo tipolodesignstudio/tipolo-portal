@@ -1,6 +1,8 @@
 import { createRootRoute, createRoute, createRouter, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/shell/AppShell";
 import { Home } from "@/pages/Home";
+import { ClientsList } from "@/pages/clients/ClientsList";
+import { ClientDetail } from "@/pages/clients/ClientDetail";
 
 const root = createRootRoute({
   component: AppShell,
@@ -14,9 +16,11 @@ const root = createRootRoute({
 });
 
 const home = createRoute({ getParentRoute: () => root, path: "/", component: Home });
+const clients = createRoute({ getParentRoute: () => root, path: "/clients", component: ClientsList });
+const client = createRoute({ getParentRoute: () => root, path: "/clients/$id", component: ClientDetail });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home]),
+  routeTree: root.addChildren([home, clients, client]),
   defaultPreload: "intent",
 });
 

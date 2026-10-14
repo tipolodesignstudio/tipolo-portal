@@ -9,7 +9,7 @@ export type NavItem = { label: string; icon: LucideIcon; to?: string; legacy?: s
 
 export const NAV: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
-  { label: "Clients", icon: Users, legacy: "/clients" },
+  { label: "Clients", icon: Users, to: "/clients" },
   { label: "Proposals", icon: FileText, legacy: "/proposals" },
   { label: "Projects", icon: FolderKanban, legacy: "/projects" },
   { label: "Timesheets", icon: Clock, legacy: "/timesheets" },

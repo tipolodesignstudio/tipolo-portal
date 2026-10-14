@@ -49,7 +49,7 @@ export function AppShell() {
             n.to ? (
               <Link key={n.label} to={n.to} className={cn(item, "text-ink-soft hover:bg-card hover:text-ink")}
                     activeProps={{ className: "bg-card text-ink font-medium shadow-[0_1px_2px_rgb(36_42_32/0.06)]" }}
-                    activeOptions={{ exact: true }}>
+                    activeOptions={{ exact: n.to === "/" }}>
                 <n.icon className="size-4" />{n.label}
               </Link>
             ) : (
@@ -83,7 +83,8 @@ export function AppShell() {
         </div>
       </main>
 
-      <CommandMenu open={searchOpen} onOpenChange={setSearchOpen} />
+      {/* mounted only while open, so the search box always starts empty */}
+      {searchOpen && <CommandMenu open onOpenChange={setSearchOpen} />}
     </div>
   );
 }

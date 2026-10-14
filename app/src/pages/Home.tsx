@@ -1,9 +1,11 @@
+import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FolderKanban, FileText, Receipt, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { NAV } from "@/lib/nav";
-import { legacy, money } from "@/lib/utils";
+import { legacy } from "@/lib/utils";
+import { money } from "@/lib/format";
 import { Card, CardTitle } from "@/components/ui/card";
 
 /* Phase 0's front page: proof the new app reads the live portal, and a map of what has
@@ -34,7 +36,8 @@ export function Home() {
   const { data, error, isLoading } = useQuery({ queryKey: ["snapshot"], queryFn: loadSnapshot });
   const handle = session?.user.email?.split("@")[0] ?? "";
   const first = handle ? handle[0].toUpperCase() + handle.slice(1) : "";
-  const today = new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
+  const [today] = React.useState(() =>
+    new Intl.DateTimeFormat("en-CA", { weekday: "long", month: "long", day: "numeric" }).format(new Date()));
 
   const stats = [
     { label: "Active projects", value: data?.activeProjects, icon: FolderKanban, href: legacy("/projects") },
