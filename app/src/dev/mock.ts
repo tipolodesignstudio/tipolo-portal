@@ -3,6 +3,7 @@
 // import.meta.env.DEV is true, so it never reaches the published build.
 //
 import { defaultSections, defaultLineItems } from "@/lib/doc";
+import { defaultInvoiceSections } from "@/lib/invoice-doc";
 
 // It answers just enough of Supabase's REST API (select with embeds, eq/in/ilike/or
 // filters, ordering, insert/update/delete) for the rebuilt screens to work.
@@ -101,10 +102,22 @@ const db: Record<string, Row[]> = {
   ],
   staff_tiers: [{ id: "st1", name: "Principal Designer", hourly_rate: 85, is_default: true, sort_order: 0 }],
   app_settings: [{ id: "1", business_name: "Tipolo Design Studio", email: "hello@tipolo.ca", phone: "604.729.0597",
-    address: "Port Moody, BC", hours_per_day: 8, tax_lines: [], currency: "CAD" }],
+    address: "Port Moody, BC", hours_per_day: 8, currency: "CAD",
+    tax_lines: [{ label: "GST", rate: 5, enabled: true }, { label: "PST", rate: 7, enabled: true }],
+    income_payment_methods: ["Business card", "E-transfer", "Cheque"] }],
   invoices: [
-    { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970, issue_date: "2026-09-09", due_date: "2026-10-09" },
-    { id: "i2", project_id: "p1", number: "26102-002", status: "sent", total: 1250, issue_date: "2026-09-25", due_date: "2026-10-10" },
+    { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970, subtotal: 970, issue_date: "2026-09-09", due_date: "2026-10-09",
+      paid_date: "2026-09-20", created_at: ago(35), sections: defaultInvoiceSections(), apply_taxes: false,
+      progress_lines: [{ id: "L1", description: "Task 1: Template exploration & mock-ups", budget: 1020, amount: 970 }] },
+    { id: "i2", project_id: "p1", number: "26102-002", status: "sent", total: 1250, subtotal: 1250, issue_date: "2026-09-25", due_date: "2026-10-10",
+      created_at: ago(19), sections: defaultInvoiceSections(), apply_taxes: false,
+      progress_lines: [{ id: "L1", description: "Task 1: Template exploration & mock-ups", budget: 1020, amount: 50 },
+                       { id: "L2", description: "Task 2: Homepage design", budget: 2000, amount: 1200 }] },
+    { id: "i3", project_id: "p1", number: null, status: "draft", total: 0, subtotal: 0, issue_date: "2026-10-14", due_date: null,
+      created_at: ago(0), sections: defaultInvoiceSections(), apply_taxes: false, prepared_by: "Jim Dema-ala",
+      progress_lines: [{ id: "L1", description: "Task 1: Template exploration & mock-ups", budget: 1020, amount: 0 },
+                       { id: "L2", description: "Task 2: Homepage design", budget: 2000, amount: 0 },
+                       { id: "L3", description: "Task 3: Inner pages", budget: 1825, amount: 0 }] },
   ],
 };
 (window as unknown as { __mockDb: typeof db }).__mockDb = db;
@@ -134,6 +147,7 @@ const FK: Record<string, Record<string, { table: string; on: string; many?: bool
   },
   expenses: { category: { table: "client_categories", on: "category_id" } },
   time_entries: { project: { table: "projects", on: "project_id" } },
+  invoices: { project: { table: "projects", on: "project_id" } },
   proposals: {
     client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" },
     converted_project: { table: "projects", on: "converted_project_id" },
@@ -205,6 +219,13 @@ window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   }
   await new Promise((r) => setTimeout(r, 120));        // feel like a network
   const table = url.pathname.split("/").pop()!;
+  if (url.pathname.includes("/rpc/")) {                       // database functions
+    if (table === "next_invoice_number") {
+      const n = db.invoices.filter((i) => i.number).length + 1;
+      return json(`26102-${String(n).padStart(3, "0")}`);
+    }
+    return json(null);
+  }
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
   const single = /vnd\.pgrst\.object/.test(headers.get("accept") ?? "");

@@ -13,7 +13,7 @@ export const NAV: NavItem[] = [
   { label: "Proposals", icon: FileText, to: "/proposals" },
   { label: "Projects", icon: FolderKanban, to: "/projects" },
   { label: "Timesheets", icon: Clock, to: "/timesheets" },
-  { label: "Invoices", icon: Receipt, legacy: "/invoices" },
+  { label: "Invoices", icon: Receipt, to: "/invoices" },
   { label: "Income & Expenses", icon: Wallet, legacy: "/expenses" },
   { label: "Settings", icon: Settings, legacy: "/settings" },
 ];

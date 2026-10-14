@@ -21,6 +21,7 @@ import {
 } from "@/lib/data/projects";
 import { BudgetBar } from "./ProjectsList";
 import { ProjectDialog } from "./ProjectDialog";
+import { NewInvoiceDialog } from "@/pages/invoices/InvoicesList";
 
 const TABS = ["overview", "time", "expenses", "invoices", "proposals"] as const;
 type Tab = (typeof TABS)[number];
@@ -34,6 +35,7 @@ export function ProjectDetail() {
   const { data: settings } = useQuery(settingsQuery);
   const update = useUpdateProject();
   const [editing, setEditing] = React.useState(false);
+  const [invoicing, setInvoicing] = React.useState(false);
 
   if (isLoading) return <div className="h-96 animate-pulse rounded-lg bg-card" />;
   if (error || !p) return <EmptyState title="Project not found">{(error as Error)?.message} <Link to="/projects" className="text-accent underline">Back to projects</Link></EmptyState>;
@@ -135,18 +137,18 @@ export function ProjectDetail() {
         <Card className="p-0">
           <div className="flex items-center justify-between px-5 pt-5">
             <CardTitle>Invoices</CardTitle>
-            <Button variant="outline" size="sm" asChild><a href={legacy("/invoices")}><Plus />New invoice<ExternalLink /></a></Button>
+            <Button variant="outline" size="sm" onClick={() => setInvoicing(true)}><Plus />New invoice</Button>
           </div>
           {work?.invoices.length ? (
             <ul className="mt-3 divide-y divide-border/70 border-t border-border/70">
               {work.invoices.map((inv) => (
                 <li key={inv.id}>
-                  <a href={legacy(`/invoices/${inv.id}`)} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-bg/60">
+                  <Link to="/invoices/$id" params={{ id: inv.id }} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-bg/60">
                     <span className="w-28 tabular-nums">{inv.number ?? "draft"}</span>
                     <span className="flex-1 text-ink-faint">{inv.issue_date ? date(inv.issue_date) : ""}</span>
                     <span className="tabular-nums">{money(inv.total)}</span>
                     <StatusBadge status={invoiceStatus(inv)} />
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -174,6 +176,7 @@ export function ProjectDetail() {
       )}
 
       {editing && <ProjectDialog project={p} onClose={() => setEditing(false)} />}
+      {invoicing && <NewInvoiceDialog projectId={p.id} onClose={() => setInvoicing(false)} />}
     </div>
   );
 }

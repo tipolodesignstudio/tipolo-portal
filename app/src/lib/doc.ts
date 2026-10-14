@@ -14,14 +14,14 @@ import * as tokMod from "@site/js/core/tokens.js";
 import * as calcMod from "@site/js/core/invoice-calc.js";
 
 export type Part = "cover" | "workplan" | "schedule" | "fees" | "agreement";
-export type BlockKind = "payment" | "schedule" | "fees" | "optional-fees" | "signature";
+export type BlockKind = "payment" | "schedule" | "fees" | "optional-fees" | "signature" | "progress";
 
 export type PaymentRow = { pct: number | ""; label: string };
 export type ScheduleRow = { task: string; start: string; due: string };
 export type OptionalRow = { code: string; description: string; fee: string };
 
 export type Block = {
-  part?: Part;
+  part?: Part | "details" | "lines" | "payment";   // the last three are an invoice's
   level?: number;
   heading?: string;
   body?: string;
@@ -57,4 +57,5 @@ export const KIND_LABEL: Record<BlockKind, string> = {
   fees: "Base scope fee table",
   "optional-fees": "Optional scope fee table",
   signature: "Signature block",
+  progress: "Invoice table",
 };

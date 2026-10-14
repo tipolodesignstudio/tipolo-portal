@@ -13,10 +13,15 @@ const th = "px-1 pb-1 text-left text-[11px] font-medium uppercase tracking-wide 
 
 /* ---------------- the frame every block sits in ---------------- */
 
-export function BlockFrame({ block, editable, active, onFocus, onChange, onMove, onDelete, children }: {
+export function BlockFrame({ block, editable, active, onFocus, onChange, onMove, onDelete, children, levels = LEVELS, label, canDelete = true }: {
   block: Block; editable: boolean; active: boolean;
   onFocus: () => void; onChange: (patch: Partial<Block>) => void;
   onMove: (dir: -1 | 1) => void; onDelete: () => void; children: React.ReactNode;
+  /** the heading levels on offer: an invoice only has body text and one heading */
+  levels?: { value: number; label: string }[];
+  /** what a table block is called, for kinds the proposal doesn't have */
+  label?: string;
+  canDelete?: boolean;
 }) {
   const level = block.level ?? (block.heading ? 2 : 0);
   return (
@@ -31,7 +36,7 @@ export function BlockFrame({ block, editable, active, onFocus, onChange, onMove,
             <select value={level} title="Level"
               onChange={(e) => { const l = Number(e.target.value); onChange(l === 0 ? { level: 0, heading: "" } : { level: l }); }}
               className="h-6 rounded bg-transparent px-1 text-[12px] text-ink-soft focus:outline-none">
-              {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+              {levels.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>
           )}
           <label className="flex items-center gap-1 px-1 text-[12px] text-ink-soft" title="Start this block on a new page">
@@ -40,10 +45,10 @@ export function BlockFrame({ block, editable, active, onFocus, onChange, onMove,
           </label>
           <IconBtn title="Move up" onClick={() => onMove(-1)}><ArrowUp /></IconBtn>
           <IconBtn title="Move down" onClick={() => onMove(1)}><ArrowDown /></IconBtn>
-          <IconBtn title="Delete" onClick={onDelete} danger><Trash2 /></IconBtn>
+          {canDelete && <IconBtn title="Delete" onClick={onDelete} danger><Trash2 /></IconBtn>}
         </div>
       )}
-      {block.kind && <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-faint">{KIND_LABEL[block.kind]}</div>}
+      {block.kind && <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-faint">{label ?? KIND_LABEL[block.kind]}</div>}
       {children}
     </div>
   );

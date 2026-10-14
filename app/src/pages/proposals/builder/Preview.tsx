@@ -12,8 +12,10 @@ const PAGE_W = 8.5 * 96;
 /* The preview is not a mock-up: it's proposalDocHtml(), the same markup the printer
    gets, laid out by the same document.css into real 8.5x11 sheets. If it looks right
    here it prints right. */
-export function Preview({ doc, settings, sourcePath = null, pdfOnly = false, docOnly = false, onAttach }: {
+export function Preview({ doc, settings, sourcePath = null, pdfOnly = false, docOnly = false, onAttach, render = proposalDocHtml }: {
   doc: unknown; settings: unknown; sourcePath?: string | null; pdfOnly?: boolean;
+  /** builds the pages: the proposal by default, the invoice for invoices */
+  render?: (doc: unknown, settings: unknown) => string;
   /** a template has no PDF of its own: show just the document */
   docOnly?: boolean;
   onAttach?: (f: File) => Promise<void>;
@@ -31,11 +33,11 @@ export function Preview({ doc, settings, sourcePath = null, pdfOnly = false, doc
   React.useEffect(() => {
     if (mode !== "doc") return;
     const t = setTimeout(() => {
-      try { setHtml(proposalDocHtml(doc, settings)); }
+      try { setHtml(render(doc, settings)); }
       catch (e) { setHtml(`<p style="padding:24px;color:#7A3F1D">Couldn't draw the preview: ${(e as Error).message}</p>`); }
     }, 160);
     return () => clearTimeout(t);
-  }, [doc, settings, mode]);
+  }, [doc, settings, mode, render]);
 
   const fit = React.useCallback(() => {
     if (!pane.current || !paper.current) return;
