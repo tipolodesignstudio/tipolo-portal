@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ArrowUpRight, LogOut, Search } from "lucide-react";
+import { ArrowUpRight, LogOut, Menu, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { NAV } from "@/lib/nav";
@@ -14,6 +14,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 export function AppShell() {
   const { session } = useAuth();
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const fullBleed = useRouterState({ select: (s) => s.matches.some((m) => m.staticData?.fullBleed) });
 
   React.useEffect(() => {
@@ -76,11 +77,29 @@ export function AppShell() {
 
       <main className="min-w-0 flex-1">
         {/* phones: no sidebar, so search and the menu live up here */}
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3 md:hidden">
-          <span className="font-heading text-lg text-accent">tipolo</span>
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => setSearchOpen(true)}>
-            <Search />Search
-          </Button>
+        <div className="border-b border-border md:hidden">
+          <div className="flex items-center gap-2 px-4 py-3">
+            <Button variant="ghost" size="icon" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>{menuOpen ? <X /> : <Menu />}</Button>
+            <span className="font-heading text-lg text-accent">tipolo</span>
+            <Button variant="outline" size="sm" className="ml-auto" onClick={() => setSearchOpen(true)}>
+              <Search />Search
+            </Button>
+          </div>
+          {menuOpen && <div className="px-3"><Timer /></div>}
+          {menuOpen && (
+            // any choice in the menu closes it
+            <nav className="grid grid-cols-2 gap-1 px-3 pb-3" onClick={() => setMenuOpen(false)}>
+              {NAV.map((n) => n.to ? (
+                <Link key={n.label} to={n.to} className={cn(item, "text-ink-soft hover:bg-card")}
+                      activeProps={{ className: "bg-card text-ink font-medium" }} activeOptions={{ exact: n.to === "/" }}>
+                  <n.icon className="size-4" />{n.label}
+                </Link>
+              ) : (
+                <a key={n.label} href={legacy(n.legacy!)} className={cn(item, "text-ink-soft hover:bg-card")}><n.icon className="size-4" />{n.label}</a>
+              ))}
+              <button onClick={() => supabase.auth.signOut()} className={cn(item, "text-ink-soft hover:bg-card")}><LogOut className="size-4" />Sign out</button>
+            </nav>
+          )}
         </div>
         {fullBleed ? <Outlet /> : (
           <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">

@@ -1,6 +1,5 @@
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/shell/AppShell";
-import { Home } from "@/pages/Home";
 import { ClientsList } from "@/pages/clients/ClientsList";
 import { ClientDetail } from "@/pages/clients/ClientDetail";
 import { ProposalsList } from "@/pages/proposals/ProposalsList";
@@ -8,6 +7,8 @@ import { ProjectsList } from "@/pages/projects/ProjectsList";
 import { ProjectDetail } from "@/pages/projects/ProjectDetail";
 import { Timesheets } from "@/pages/Timesheets";
 import { InvoicesList } from "@/pages/invoices/InvoicesList";
+// the dashboard carries the charting library; other pages don't need to wait for it
+const Home = lazyRouteComponent(() => import("@/pages/Home"), "Home");
 const IncomeExpenses = lazyRouteComponent(() => import("@/pages/books/IncomeExpenses"), "IncomeExpenses");
 const InvoiceBuilder = lazyRouteComponent(() => import("@/pages/invoices/InvoiceBuilder"), "InvoiceBuilder");
 
