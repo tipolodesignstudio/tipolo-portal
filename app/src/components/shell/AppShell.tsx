@@ -7,6 +7,7 @@ import { NAV } from "@/lib/nav";
 import { cn, legacy } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CommandMenu } from "./CommandMenu";
+import { Timer } from "@/components/time/Timer";
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -44,6 +45,8 @@ export function AppShell() {
           Search
           <kbd className="ml-auto rounded border border-border bg-bg px-1.5 text-[11px]">{isMac ? "⌘" : "Ctrl"} K</kbd>
         </button>
+
+        <Timer />
 
         <nav className="flex flex-col gap-0.5">
           {NAV.map((n) =>

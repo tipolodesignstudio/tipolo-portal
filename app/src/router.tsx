@@ -6,6 +6,7 @@ import { ClientDetail } from "@/pages/clients/ClientDetail";
 import { ProposalsList } from "@/pages/proposals/ProposalsList";
 import { ProjectsList } from "@/pages/projects/ProjectsList";
 import { ProjectDetail } from "@/pages/projects/ProjectDetail";
+import { Timesheets } from "@/pages/Timesheets";
 
 // The builder, templates and importers carry the print code and the PDF reader, so they
 // load when first opened rather than with every page.
@@ -36,6 +37,7 @@ const project = createRoute({
   getParentRoute: () => root, path: "/projects/$id", component: ProjectDetail,
   validateSearch: (s: Record<string, unknown>): { tab?: string } => (typeof s.tab === "string" ? { tab: s.tab } : {}),
 });
+const timesheets = createRoute({ getParentRoute: () => root, path: "/timesheets", component: Timesheets });
 const importPdf = createRoute({ getParentRoute: () => root, path: "/proposals/import", component: ImportPdf });
 const fromDrive = createRoute({ getParentRoute: () => root, path: "/proposals/from-drive", component: FromDrive });
 const templates = createRoute({ getParentRoute: () => root, path: "/proposals/templates", component: TemplatesList });
@@ -43,7 +45,7 @@ const template = createRoute({ getParentRoute: () => root, path: "/proposals/tem
 const proposal = createRoute({ getParentRoute: () => root, path: "/proposals/$id", component: ProposalBuilder, staticData: { fullBleed: true } });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project]),
+  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project, timesheets]),
   defaultPreload: "intent",
 });
 

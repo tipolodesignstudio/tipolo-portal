@@ -9,6 +9,10 @@ import { defaultSections, defaultLineItems } from "@/lib/doc";
 
 type Row = Record<string, unknown> & { id: string };
 const now = () => new Date().toISOString();
+const thisWeek = (i: number) => {       // Monday + i, local time
+  const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + i);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 const ago = (days: number) => new Date(Date.now() - days * 864e5).toISOString();
 let seq = 100;
 const uid = () => `00000000-0000-4000-8000-${String(++seq).padStart(12, "0")}`;
@@ -66,6 +70,11 @@ const db: Record<string, Row[]> = {
     { id: "te2", project_id: "p1", entry_date: "2026-10-07", minutes: 150, billable: true, rate: 85, invoice_id: null, description: "Client call + revisions", created_at: ago(6) },
     { id: "te3", project_id: "p1", entry_date: "2026-09-12", minutes: 480, billable: true, rate: 85, invoice_id: "i1", description: "Template exploration", created_at: ago(31) },
     { id: "te4", project_id: "p1", entry_date: "2026-10-10", minutes: 45, billable: false, rate: 85, invoice_id: null, description: "Internal file setup", created_at: ago(3) },
+    // this week, so the timesheet has something on it
+    { id: "te5", project_id: "p1", entry_date: thisWeek(0), minutes: 240, billable: true, rate: 85, invoice_id: null, description: "Inner page layouts", created_by: "u-mock", created_at: ago(2) },
+    { id: "te6", project_id: "p1", entry_date: thisWeek(0), minutes: 60, billable: true, rate: 85, invoice_id: null, description: "Image research", created_by: "u-other", created_at: ago(2) },
+    { id: "te7", project_id: "p2", entry_date: thisWeek(1), minutes: 90, billable: true, rate: 95, invoice_id: null, description: "Site visit", created_by: "u-mock", created_at: ago(1) },
+    { id: "te8", project_id: "p2", entry_date: thisWeek(1), minutes: 30, billable: false, rate: 95, invoice_id: null, description: "Travel", created_by: "u-mock", created_at: ago(1) },
   ],
   expenses: [
     { id: "ex1", project_id: "p1", expense_date: "2026-09-20", description: "Stock photography", amount: 64.5, category_id: "cat-co", billable: true, markup_pct: 10, invoice_id: null },
@@ -124,6 +133,7 @@ const FK: Record<string, Record<string, { table: string; on: string; many?: bool
     contact: { table: "client_contacts", on: "contact_id" },
   },
   expenses: { category: { table: "client_categories", on: "category_id" } },
+  time_entries: { project: { table: "projects", on: "project_id" } },
   proposals: {
     client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" },
     converted_project: { table: "projects", on: "converted_project_id" },
