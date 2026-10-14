@@ -21,7 +21,7 @@ import { escapeHtml, money, num, date, longDate } from "../core/format.js";
 import { lineAmount } from "../core/invoice-calc.js";
 import { buildTokenMap, resolveTokens } from "../core/tokens.js";
 import { esc, prose } from "./doc-text.js";
-import { clientPrimaryContact } from "../core/api.js";
+import { clientPrimaryContact } from "../core/contacts.js";
 import { normaliseSections } from "../core/proposal-template.js";
 import { buildGantt } from "../core/gantt.js";
 import { paginate } from "./paginate.js";

@@ -2,6 +2,8 @@
 // the live database, signed in as a stand-in user. main.tsx imports this only when
 // import.meta.env.DEV is true, so it never reaches the published build.
 //
+import { defaultSections, defaultLineItems } from "@/lib/doc";
+
 // It answers just enough of Supabase's REST API (select with embeds, eq/in/ilike/or
 // filters, ordering, insert/update/delete) for the rebuilt screens to work.
 
@@ -52,9 +54,28 @@ const db: Record<string, Row[]> = {
     { id: "p1", client_id: "c1", number: "26102", title: "ConnectLA Website", scope: "multimedia", status: "active", due_date: "2026-11-30", budget: 4845, updated_at: ago(2) },
   ],
   proposals: [
-    { id: "pr1", client_id: "c1", number: "26102", title: "Website Redesign", subtotal: 4845, status: "accepted", created_at: ago(35) },
-    { id: "pr2", client_id: "c2", number: "26103", title: "Axford Bay Residence", subtotal: 2040, status: "sent", created_at: ago(10) },
+    { id: "pr1", client_id: "c1", number: "26102", title: "Website Redesign", subtotal: 4845, status: "accepted",
+      doc_mode: "builder", project_scope: "multimedia", sections: [], line_items: [{ description: "Task 1: Template exploration", qty: 1, unit_price: 1020 }],
+      converted_project_id: "p1", sent_date: "2026-09-01", valid_until: "2027-09-01", created_at: ago(35) },
+    { id: "pr2", client_id: "c2", number: "26103", title: "Axford Bay Residence", subtotal: 2040, status: "sent",
+      doc_mode: "pdf", project_scope: "landscape", sections: [],
+      line_items: [{ description: "Site analysis", qty: 1, unit_price: 840 }, { description: "Concept plan", qty: 1, unit_price: 1200 }],
+      source_pdf_path: `${location.origin}/@fs${import.meta.env.VITE_SAMPLE_PDF ?? ""}`,
+      sent_date: "2026-10-03", valid_until: "2027-10-03", created_at: ago(10) },
+    { id: "pr3", client_id: "c3", number: "26104", title: "Backyard Planting Plan", subtotal: 0, status: "draft",
+      doc_mode: "builder", project_scope: "landscape", sections: defaultSections(), line_items: defaultLineItems(),
+      created_at: ago(1) },
   ],
+  proposal_revisions: [
+    { id: "rv1", proposal_id: "pr2", revised_on: "2026-10-08", note: "Fees revised after the site visit", created_at: ago(5) },
+  ],
+  proposal_templates: [
+    { id: "t1", name: "Website design", sections: [{ part: "workplan", level: 1, heading: "Work Plan", body: "Website for {{client.name}}." }],
+      default_line_items: [{ description: "Discovery", qty: 1, unit_price: 600 }] },
+  ],
+  staff_tiers: [{ id: "st1", name: "Principal Designer", hourly_rate: 85, is_default: true, sort_order: 0 }],
+  app_settings: [{ id: "1", business_name: "Tipolo Design Studio", email: "hello@tipolo.ca", phone: "604.729.0597",
+    address: "Port Moody, BC", hours_per_day: 8, tax_lines: [], currency: "CAD" }],
   invoices: [
     { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970 },
     { id: "i2", project_id: "p1", number: "26102-002", status: "sent", total: 1250 },
@@ -82,7 +103,10 @@ const FK: Record<string, Record<string, { table: string; on: string; many?: bool
     contacts: { table: "client_contacts", on: "client_id", many: true },
   },
   projects: { client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" } },
-  proposals: { client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" } },
+  proposals: {
+    client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" },
+    converted_project: { table: "projects", on: "converted_project_id" },
+  },
 };
 
 function project(table: string, row: Row, select: string): Record<string, unknown> {
@@ -140,6 +164,9 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 const realFetch = window.fetch.bind(window);
 window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+  if (url.pathname.startsWith("/storage/v1/object/")) {           // uploads: accept and forget
+    return json({ Key: url.pathname.split("/object/")[1], Id: uid() });
+  }
   if (!url.pathname.startsWith("/rest/v1/")) {
     if (url.pathname.startsWith("/auth/v1/")) return json({});
     return realFetch(input, init);

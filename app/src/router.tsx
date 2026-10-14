@@ -3,6 +3,8 @@ import { AppShell } from "@/components/shell/AppShell";
 import { Home } from "@/pages/Home";
 import { ClientsList } from "@/pages/clients/ClientsList";
 import { ClientDetail } from "@/pages/clients/ClientDetail";
+import { ProposalsList } from "@/pages/proposals/ProposalsList";
+import { ProposalBuilder } from "@/pages/proposals/ProposalBuilder";
 
 const root = createRootRoute({
   component: AppShell,
@@ -18,12 +20,16 @@ const root = createRootRoute({
 const home = createRoute({ getParentRoute: () => root, path: "/", component: Home });
 const clients = createRoute({ getParentRoute: () => root, path: "/clients", component: ClientsList });
 const client = createRoute({ getParentRoute: () => root, path: "/clients/$id", component: ClientDetail });
+const proposals = createRoute({ getParentRoute: () => root, path: "/proposals", component: ProposalsList });
+// the builder uses the whole window, beside the sidebar
+const proposal = createRoute({ getParentRoute: () => root, path: "/proposals/$id", component: ProposalBuilder, staticData: { fullBleed: true } });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, clients, client]),
+  routeTree: root.addChildren([home, clients, client, proposals, proposal]),
   defaultPreload: "intent",
 });
 
 declare module "@tanstack/react-router" {
   interface Register { router: typeof router }
+  interface StaticDataRouteOption { fullBleed?: boolean }
 }

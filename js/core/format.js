@@ -36,9 +36,12 @@ export function longDate(value) {
   return _longDateFmt.format(d);
 }
 
+// YYYY-MM-DD in the studio's own time zone. (toISOString() gave UTC, which in BC is
+// already tomorrow from late afternoon — so "today" defaulted to tomorrow's date.)
 export function isoDate(value = new Date()) {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const d = value instanceof Date ? value : new Date(value);
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export function relTime(value) {

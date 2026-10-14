@@ -17,7 +17,7 @@
 import { escapeHtml, num, longDate } from "../core/format.js";
 import { resolveTokens } from "../core/tokens.js";
 import { esc, prose } from "./doc-text.js";
-import { clientPrimaryContact } from "../core/api.js";
+import { clientPrimaryContact } from "../core/contacts.js";
 import { normaliseInvoiceSections } from "../core/invoice-template.js";
 import { computeProgressTotals, lineBalance } from "../core/invoice-calc.js";
 import { paginate } from "./paginate.js";

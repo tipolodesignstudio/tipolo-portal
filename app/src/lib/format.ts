@@ -4,6 +4,17 @@
 const cad = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" });
 export const money = (n: number | string | null | undefined) => cad.format(Number(n) || 0);
 
+/* Today as YYYY-MM-DD in the studio's own time zone. toISOString() would give UTC, which
+   in BC is already tomorrow from late afternoon. */
+export function localISO(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+export function addYearsISO(iso: string, years: number) {
+  const d = new Date(iso + "T00:00:00");
+  d.setFullYear(d.getFullYear() + years);
+  return localISO(d);
+}
+
 const asDate = (value: string | Date) =>
   value instanceof Date ? value : new Date(value + (String(value).length === 10 ? "T00:00:00" : ""));
 

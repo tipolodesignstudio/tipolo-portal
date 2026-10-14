@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { ConfirmProvider } from "@/components/ui/confirm";
 import { router } from "@/router";
 import { Login } from "@/pages/Login";
 import "./index.css";
@@ -31,7 +32,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Gate />
+        <ConfirmProvider>
+          <Gate />
+        </ConfirmProvider>
       </AuthProvider>
       <Toaster position="bottom-right" toastOptions={{ className: "!font-sans !text-sm" }} />
     </QueryClientProvider>

@@ -32,7 +32,7 @@ async function search(term: string) {
     projects: (p.data ?? []).map((r): Hit => ({
       id: r.id, label: `${r.number ?? ""} ${r.title}`.trim(), sub: clientName(r), path: `/projects/${r.id}` })),
     proposals: (pr.data ?? []).map((r): Hit => ({
-      id: r.id, label: `${r.number ?? ""} ${r.title}`.trim(), sub: clientName(r), path: `/proposals/${r.id}` })),
+      id: r.id, label: `${r.number ?? ""} ${r.title}`.trim(), sub: clientName(r), path: `/proposals/${r.id}`, inApp: true })),
   };
 }
 

@@ -12,6 +12,7 @@ import { date, money, relTime } from "@/lib/format";
 import { legacy } from "@/lib/utils";
 import { clientNotesQuery, clientQuery, clientWorkQuery, useAddNote } from "@/lib/data/clients";
 import { ClientDialog } from "./ClientDialog";
+import { NewProposalDialog } from "@/pages/proposals/NewProposalDialog";
 
 function Notes({ clientId }: { clientId: string }) {
   const { data: notes = [], isLoading } = useQuery(clientNotesQuery(clientId));
@@ -58,6 +59,7 @@ export function ClientDetail() {
   const { data: c, isLoading, error } = useQuery(clientQuery(id));
   const { data: work } = useQuery(clientWorkQuery(id));
   const [editing, setEditing] = React.useState(false);
+  const [proposing, setProposing] = React.useState(false);
 
   if (isLoading) return <div className="h-96 animate-pulse rounded-lg bg-card" />;
   if (error || !c) {
@@ -91,7 +93,7 @@ export function ClientDetail() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setEditing(true)}><Pencil />Edit</Button>
-            <Button asChild><a href={legacy("/proposals")}><Plus />New proposal</a></Button>
+            <Button onClick={() => setProposing(true)}><Plus />New proposal</Button>
           </div>
         </div>
       </div>
@@ -118,12 +120,12 @@ export function ClientDetail() {
               <ul className="mt-3 divide-y divide-border/70 border-t border-border/70">
                 {proposals.map((p) => (
                   <li key={p.id}>
-                    <a href={legacy(`/proposals/${p.id}`)} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-bg/60">
+                    <Link to="/proposals/$id" params={{ id: p.id }} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-bg/60">
                       <span className="w-14 shrink-0 tabular-nums text-ink-faint">{p.number ?? "—"}</span>
                       <span className="min-w-0 flex-1 truncate">{p.title}</span>
                       <span className="tabular-nums text-ink-soft">{money(p.subtotal)}</span>
                       <StatusBadge status={p.status} />
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -188,6 +190,7 @@ export function ClientDetail() {
       </div>
 
       <ClientDialog open={editing} onOpenChange={setEditing} client={c} />
+      <NewProposalDialog open={proposing} onOpenChange={setProposing} clientId={c.id} />
     </div>
   );
 }

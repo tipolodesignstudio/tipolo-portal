@@ -14,6 +14,10 @@ export default defineConfig({
       // One config for both apps: the public Supabase and Google values live in the
       // repo's config.js, which the current portal already reads.
       "@portal-config": path.resolve(import.meta.dirname, "../config.js"),
+      // The previous portal's framework-free code: the printed documents (letterhead,
+      // proposals, invoices), template content, tokens and the PDF reader. Shared rather
+      // than copied, so a proposal prints the same from either version.
+      "@site": path.resolve(import.meta.dirname, ".."),
     },
   },
   server: { port: 5173, fs: { allow: [".."] } },

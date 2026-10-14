@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { ArrowUpRight, LogOut, Search } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -13,6 +13,7 @@ const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigat
 export function AppShell() {
   const { session } = useAuth();
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const fullBleed = useRouterState({ select: (s) => s.matches.some((m) => m.staticData?.fullBleed) });
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -78,9 +79,11 @@ export function AppShell() {
             <Search />Search
           </Button>
         </div>
-        <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
-          <Outlet />
-        </div>
+        {fullBleed ? <Outlet /> : (
+          <div className="mx-auto max-w-6xl px-4 py-6 md:px-8 md:py-8">
+            <Outlet />
+          </div>
+        )}
       </main>
 
       {/* mounted only while open, so the search box always starts empty */}

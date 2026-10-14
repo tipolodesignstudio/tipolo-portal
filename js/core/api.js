@@ -284,17 +284,8 @@ export async function updateProject(id, patch) {
   return unwrap(await supabase.from("projects").update(patch).eq("id", id).select(PROJECT_SELECT).single());
 }
 
-/* who an invoice/proposal is addressed to: project contact -> client primary contact */
-export function billingContact(project) {
-  if (!project) return null;
-  if (project.contact) return project.contact;
-  const cs = project.client?.contacts || [];
-  return cs.find((c) => c.is_primary) || cs[0] || null;
-}
-export function clientPrimaryContact(client) {
-  const cs = client?.contacts || [];
-  return cs.find((c) => c.is_primary) || cs[0] || null;
-}
+// moved to contacts.js so the printed documents don't pull in the database client
+export { billingContact, clientPrimaryContact } from "./contacts.js";
 
 /* effective hourly rate: project override -> client default -> settings default */
 export function effectiveRate(project, settings) {
