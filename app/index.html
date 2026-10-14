@@ -4,7 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
-    <link rel="icon" type="image/svg+xml" href="/beta/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // The previous portal used hash routes (/#/projects/…), and Supabase's emailed
+      // sign-in and password-reset links arrive as #access_token=…. Both belong to the
+      // previous portal at /legacy/, so hand them over, hash intact, before this app
+      // starts and reads them.
+      (function () {
+        var h = location.hash;
+        if (h.indexOf("#/") === 0 || /access_token=|type=recovery|error_description=/.test(h)) {
+          location.replace("/legacy/" + h);
+        }
+      })();
+    </script>
     <title>Tipolo Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

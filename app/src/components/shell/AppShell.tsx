@@ -32,7 +32,7 @@ export function AppShell() {
       <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-border bg-bg-alt/60 px-3 py-4 md:flex">
         <div className="mb-5 px-2.5">
           <div className="font-heading text-xl leading-none text-accent">tipolo</div>
-          <div className="mt-1 text-[11px] uppercase tracking-wider text-ink-faint">Portal · beta</div>
+          <div className="mt-1 text-[11px] uppercase tracking-wider text-ink-faint">Studio portal</div>
         </div>
 
         <button
@@ -54,7 +54,7 @@ export function AppShell() {
               </Link>
             ) : (
               <a key={n.label} href={legacy(n.legacy!)} className={cn(item, "group text-ink-soft hover:bg-card hover:text-ink")}
-                 title="Not rebuilt yet: opens in the current portal">
+                 title="Not rebuilt yet: opens in the previous version">
                 <n.icon className="size-4" />{n.label}
                 <ArrowUpRight className="ml-auto size-3.5 text-ink-faint opacity-0 group-hover:opacity-100" />
               </a>

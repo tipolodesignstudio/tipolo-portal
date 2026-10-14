@@ -3,9 +3,10 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "node:path";
 
-// Served at portal.tipolo.ca/beta/ alongside the current portal until cutover.
+// Served at portal.tipolo.ca. The previous portal lives on at /legacy/ for the screens
+// that haven't been rebuilt yet.
 export default defineConfig({
-  base: "/beta/",
+  base: "/",
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

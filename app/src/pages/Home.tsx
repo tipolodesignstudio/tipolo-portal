@@ -80,7 +80,7 @@ export function Home() {
             <CardTitle>This is the new portal, in progress</CardTitle>
             <p className="mt-1 text-sm text-ink-soft">
               Same data, same sign-in. Screens move here one at a time; anything not rebuilt yet
-              opens in the current portal, marked with ↗. Press <kbd className="rounded border border-border bg-bg px-1 text-xs">⌘K</kbd> to search anywhere.
+              opens in the previous version, marked with ↗. Press <kbd className="rounded border border-border bg-bg px-1 text-xs">⌘K</kbd> to search anywhere.
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5 text-[12px]">
               {rebuilt.map((l) => <span key={l} className="rounded-full bg-ok-bg px-2 py-0.5 text-ok">{l}</span>)}

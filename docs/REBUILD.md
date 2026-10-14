@@ -20,14 +20,15 @@ stays there.
 
 ## How it runs while being rebuilt
 
-- The new app lives in `app/` in this same repository. The current portal is untouched.
-- GitHub Actions builds both and publishes the new one at **portal.tipolo.ca/beta/**.
-  It's the same website, so your sign-in and your Google Drive connection carry over and
-  nothing new needs setting up.
-- You use the beta whenever you like. Anything missing from it is still in the current
-  portal, which keeps working throughout.
-- **Cutover:** once the beta matches the current portal, it moves to portal.tipolo.ca and
-  the old version moves to `/legacy/` for a few weeks as a fallback.
+- The new app is **portal.tipolo.ca** itself (decided 2026-10-13, instead of a separate
+  beta page). Its source is in `app/`.
+- The previous portal is published unchanged at **portal.tipolo.ca/legacy/**. Any screen
+  not yet rebuilt opens there from the sidebar or ⌘K, marked ↗. Same site, so the sign-in
+  and Google Drive connection are shared.
+- Old bookmarks (`/#/projects/…`) and Supabase's emailed sign-in and password-reset links
+  (`#access_token=…`) are forwarded to `/legacy/` with their link intact.
+- As each screen is rebuilt, its sidebar entry switches from the previous portal to the
+  new one (`app/src/lib/nav.ts`). When none are left, `/legacy/` is retired.
 
 ## Stack
 
@@ -60,7 +61,7 @@ Only the screens are rewritten. Your printed proposals and invoices stay pixel-i
 - Scaffold `app/`, theme Tailwind with Tipolo colours and fonts (Fredoka / Roboto).
 - App shell: sidebar, top bar, **Cmd+K search** to jump to any client, project or proposal.
 - Sign-in using the same Supabase accounts.
-- GitHub Actions pipeline that publishes `/beta/`.
+- GitHub Actions pipeline that publishes the site.
 - Database types generated from the live schema with Supabase's CLI (free), so code that
   asks for a column that doesn't exist fails to build instead of failing in front of you.
 - **Two steps for you:**
@@ -81,7 +82,7 @@ Only the screens are rewritten. Your printed proposals and invoices stay pixel-i
 ### Phase 3: Proposals and settings
 - Proposal builder, templates, PDF import, From Drive.
 - Settings (all tabs).
-- **Cutover:** the new app becomes portal.tipolo.ca.
+- `/legacy/` retired.
 
 ### Phase 4: Monograph-style features
 - **Phases on projects.** Each project's phases come from its proposal's fee lines (they

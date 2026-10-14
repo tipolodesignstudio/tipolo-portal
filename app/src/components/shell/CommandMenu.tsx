@@ -92,7 +92,7 @@ export function CommandMenu({ open, onOpenChange }: { open: boolean; onOpenChang
               <CommandItem key={n.label} value={`page-${n.label}`} onSelect={() => go(n)}>
                 <n.icon />
                 <span>{n.label}</span>
-                {!n.to && <ArrowUpRight className="ml-auto" aria-label="opens the current portal" />}
+                {!n.to && <ArrowUpRight className="ml-auto" aria-label="opens the previous version" />}
               </CommandItem>
             ))}
           </CommandGroup>

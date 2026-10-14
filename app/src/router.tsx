@@ -17,7 +17,6 @@ const home = createRoute({ getParentRoute: () => root, path: "/", component: Hom
 
 export const router = createRouter({
   routeTree: root.addChildren([home]),
-  basepath: "/beta",
   defaultPreload: "intent",
 });
 

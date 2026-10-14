@@ -24,7 +24,7 @@ export function Login() {
       <form onSubmit={submit} className="w-full max-w-sm rounded-lg border border-border bg-card p-8 shadow-sm">
         <div className="mb-6">
           <div className="font-heading text-2xl text-accent">tipolo</div>
-          <div className="mt-1 text-sm text-ink-soft">Studio portal · beta</div>
+          <div className="mt-1 text-sm text-ink-soft">Studio portal</div>
         </div>
         <div className="space-y-4">
           <div>
@@ -40,7 +40,7 @@ export function Login() {
           {error && <div className="rounded-md bg-bad-bg px-3 py-2 text-sm text-bad">{error}</div>}
           <Button type="submit" className="w-full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
           <a href={legacy("/")} className="block text-center text-[13px] text-ink-faint hover:text-ink">
-            Forgot your password? Reset it in the current portal
+            Forgot your password?
           </a>
         </div>
       </form>

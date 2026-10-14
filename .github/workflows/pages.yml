@@ -1,7 +1,7 @@
 name: Publish portal
 
-# Builds the new app and publishes it at /beta/, next to the current portal, which is
-# published exactly as before. Needs Settings → Pages → Source: "GitHub Actions".
+# Builds the portal and publishes it at portal.tipolo.ca, with the previous portal at
+# /legacy/ for the screens not rebuilt yet. Needs Settings → Pages → Source: "GitHub Actions".
 
 on:
   push:
@@ -37,18 +37,22 @@ jobs:
 
       - name: Assemble the site
         run: |
-          mkdir -p _site
-          # the current portal, as GitHub Pages served it from the branch
-          rsync -a ./ _site/ \
-            --exclude '/_site' --exclude '/app' --exclude '/docs' \
-            --exclude '/.github' --exclude '/.git' --exclude '/.gitignore' --exclude '/CLAUDE.md'
-          # the new app at /beta/
-          cp -R app/dist _site/beta
+          mkdir -p _site/legacy
+          # the new app at the root
+          cp -R app/dist/. _site/
           # GitHub Pages answers unknown paths with /404.html; serving the app there lets
-          # /beta/projects and the like load the app, which then routes itself
+          # /projects and the like load the app, which then routes itself
           cp app/dist/index.html _site/404.html
+          # the previous portal, unchanged, at /legacy/ (its paths are all relative)
+          rsync -a ./ _site/legacy/ \
+            --exclude '/_site' --exclude '/app' --exclude '/docs' --exclude '/CNAME' \
+            --exclude '/.github' --exclude '/.git' --exclude '/.gitignore' --exclude '/CLAUDE.md'
+          # anyone who bookmarked the short-lived /beta/
+          mkdir -p _site/beta
+          printf '<meta http-equiv="refresh" content="0; url=/">' > _site/beta/index.html
+          cp CNAME _site/CNAME
           touch _site/.nojekyll
-          test -f _site/CNAME && test -f _site/index.html && test -f _site/beta/index.html
+          test -f _site/CNAME && test -f _site/index.html && test -f _site/legacy/index.html && test -f _site/legacy/js/app.js
 
       - uses: actions/upload-pages-artifact@v3
         with:
