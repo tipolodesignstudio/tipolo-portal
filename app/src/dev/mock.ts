@@ -51,7 +51,24 @@ const db: Record<string, Row[]> = {
     { id: "n4", client_id: "c3", body: "Wants planting plan before spring.", created_at: ago(9) },
   ],
   projects: [
-    { id: "p1", client_id: "c1", number: "26102", title: "ConnectLA Website", scope: "multimedia", status: "active", due_date: "2026-11-30", budget: 4845, updated_at: ago(2) },
+    { id: "p1", client_id: "c1", number: "26102", title: "ConnectLA Website", scope: "multimedia", status: "active",
+      start_date: "2026-09-08", due_date: "2026-11-30", budget: null, hourly_rate: null, contact_id: null,
+      description: "Five-page website on Squarespace, branding refresh.", source_pdf_path: null,
+      deliverables: [{ label: "Template exploration & mock-ups", done: true }, { label: "Homepage design", done: false }, { label: "Inner pages", done: false }],
+      updated_at: ago(2) },
+    { id: "p2", client_id: "c3", number: "26105", title: "Santos Backyard", scope: "landscape", status: "lead",
+      start_date: null, due_date: null, budget: 3200, hourly_rate: 95, contact_id: null, description: null, deliverables: [], updated_at: ago(4) },
+    { id: "p3", client_id: "c4", number: "20007", title: "Methods Cleaning Branding", scope: "multimedia", status: "complete",
+      start_date: "2020-02-01", due_date: "2020-04-01", budget: 1800, hourly_rate: null, contact_id: null, description: null, deliverables: [], updated_at: ago(1900) },
+  ],
+  time_entries: [
+    { id: "te1", project_id: "p1", entry_date: "2026-10-09", minutes: 210, billable: true, rate: 85, invoice_id: null, description: "Homepage hero options", created_at: ago(4) },
+    { id: "te2", project_id: "p1", entry_date: "2026-10-07", minutes: 150, billable: true, rate: 85, invoice_id: null, description: "Client call + revisions", created_at: ago(6) },
+    { id: "te3", project_id: "p1", entry_date: "2026-09-12", minutes: 480, billable: true, rate: 85, invoice_id: "i1", description: "Template exploration", created_at: ago(31) },
+    { id: "te4", project_id: "p1", entry_date: "2026-10-10", minutes: 45, billable: false, rate: 85, invoice_id: null, description: "Internal file setup", created_at: ago(3) },
+  ],
+  expenses: [
+    { id: "ex1", project_id: "p1", expense_date: "2026-09-20", description: "Stock photography", amount: 64.5, category_id: "cat-co", billable: true, markup_pct: 10, invoice_id: null },
   ],
   proposals: [
     { id: "pr1", client_id: "c1", number: "26102", title: "Website Redesign", subtotal: 4845, status: "accepted",
@@ -77,8 +94,8 @@ const db: Record<string, Row[]> = {
   app_settings: [{ id: "1", business_name: "Tipolo Design Studio", email: "hello@tipolo.ca", phone: "604.729.0597",
     address: "Port Moody, BC", hours_per_day: 8, tax_lines: [], currency: "CAD" }],
   invoices: [
-    { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970 },
-    { id: "i2", project_id: "p1", number: "26102-002", status: "sent", total: 1250 },
+    { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970, issue_date: "2026-09-09", due_date: "2026-10-09" },
+    { id: "i2", project_id: "p1", number: "26102-002", status: "sent", total: 1250, issue_date: "2026-09-25", due_date: "2026-10-10" },
   ],
 };
 (window as unknown as { __mockDb: typeof db }).__mockDb = db;
@@ -102,7 +119,11 @@ const FK: Record<string, Record<string, { table: string; on: string; many?: bool
     category: { table: "client_categories", on: "category_id" },
     contacts: { table: "client_contacts", on: "client_id", many: true },
   },
-  projects: { client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" } },
+  projects: {
+    client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" },
+    contact: { table: "client_contacts", on: "contact_id" },
+  },
+  expenses: { category: { table: "client_categories", on: "category_id" } },
   proposals: {
     client: { table: "clients", on: "client_id" }, clients: { table: "clients", on: "client_id" },
     converted_project: { table: "projects", on: "converted_project_id" },
@@ -139,6 +160,7 @@ function matches(row: Row, key: string, expr: string): boolean {
       return matches(row, k, `${op}.${v.join(".")}`);
     });
   }
+  if (expr.startsWith("not.")) return !matches(row, key, expr.slice(4));
   const [op, ...rest] = expr.split(".");
   const val = rest.join(".");
   const cell = row[key];

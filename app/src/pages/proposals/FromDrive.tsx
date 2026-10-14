@@ -158,7 +158,7 @@ export function FromDrive() {
                           ))}
                         </div>
                       </div>
-                      {here ? <a href={legacy(`/projects/${here.id}`)} className="text-[13px] text-accent hover:underline">{here.title}</a> : <Badge tone="amber">not yet</Badge>}
+                      {here ? <Link to="/projects/$id" params={{ id: here.id }} className="text-[13px] text-accent hover:underline">{here.title}</Link> : <Badge tone="amber">not yet</Badge>}
                     </li>
                   );
                 })}

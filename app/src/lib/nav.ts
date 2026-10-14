@@ -11,7 +11,7 @@ export const NAV: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
   { label: "Clients", icon: Users, to: "/clients" },
   { label: "Proposals", icon: FileText, to: "/proposals" },
-  { label: "Projects", icon: FolderKanban, legacy: "/projects" },
+  { label: "Projects", icon: FolderKanban, to: "/projects" },
   { label: "Timesheets", icon: Clock, legacy: "/timesheets" },
   { label: "Invoices", icon: Receipt, legacy: "/invoices" },
   { label: "Income & Expenses", icon: Wallet, legacy: "/expenses" },

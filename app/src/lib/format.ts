@@ -65,3 +65,23 @@ export const STATUS: Record<string, { label: string; tone: Tone }> = {
   paid: { label: "Paid", tone: "green" },
   overdue: { label: "Overdue", tone: "red" },
 };
+
+/* ---- durations: minutes ↔ "h:mm" ---- */
+export function minutesToHM(mins: number | null | undefined) {
+  const m = Math.max(0, Math.round(Number(mins) || 0));
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+}
+export const hours = (mins: number | null | undefined, digits = 1) =>
+  ((Number(mins) || 0) / 60).toLocaleString("en-CA", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+
+// "1:30", "1.5", "1.5h", "90m" → minutes. A bare number is hours.
+export function parseDuration(input: string | null | undefined): number | null {
+  const s = String(input ?? "").trim().toLowerCase();
+  if (!s) return null;
+  let m: RegExpMatchArray | null;
+  if ((m = s.match(/^(\d+):([0-5]?\d)$/))) return +m[1] * 60 + +m[2];
+  if ((m = s.match(/^(\d+(?:\.\d+)?)\s*h(?:ours?)?$/))) return Math.round(parseFloat(m[1]) * 60);
+  if ((m = s.match(/^(\d+)\s*m(?:in(?:utes?)?)?$/))) return +m[1];
+  if ((m = s.match(/^(\d+(?:\.\d+)?)$/))) return Math.round(parseFloat(m[1]) * 60);
+  return null;
+}

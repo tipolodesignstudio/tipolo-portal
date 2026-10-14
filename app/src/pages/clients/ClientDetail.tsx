@@ -9,7 +9,6 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/fields";
 import { EmptyState } from "@/components/ui/data-table";
 import { date, money, relTime } from "@/lib/format";
-import { legacy } from "@/lib/utils";
 import { clientNotesQuery, clientQuery, clientWorkQuery, useAddNote } from "@/lib/data/clients";
 import { ClientDialog } from "./ClientDialog";
 import { NewProposalDialog } from "@/pages/proposals/NewProposalDialog";
@@ -139,12 +138,12 @@ export function ClientDetail() {
               <ul className="mt-3 divide-y divide-border/70 border-t border-border/70">
                 {projects.map((p) => (
                   <li key={p.id}>
-                    <a href={legacy(`/projects/${p.id}`)} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-bg/60">
+                    <Link to="/projects/$id" params={{ id: p.id }} className="flex items-center gap-3 px-5 py-3 text-sm hover:bg-bg/60">
                       <span className="w-14 shrink-0 tabular-nums text-ink-faint">{p.number ?? "—"}</span>
                       <span className="min-w-0 flex-1 truncate">{p.title}</span>
                       {p.due_date && <span className="text-[12.5px] text-ink-faint">due {date(p.due_date)}</span>}
                       <StatusBadge status={p.status} />
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

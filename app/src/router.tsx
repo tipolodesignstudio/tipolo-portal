@@ -4,6 +4,8 @@ import { Home } from "@/pages/Home";
 import { ClientsList } from "@/pages/clients/ClientsList";
 import { ClientDetail } from "@/pages/clients/ClientDetail";
 import { ProposalsList } from "@/pages/proposals/ProposalsList";
+import { ProjectsList } from "@/pages/projects/ProjectsList";
+import { ProjectDetail } from "@/pages/projects/ProjectDetail";
 
 // The builder, templates and importers carry the print code and the PDF reader, so they
 // load when first opened rather than with every page.
@@ -29,6 +31,11 @@ const clients = createRoute({ getParentRoute: () => root, path: "/clients", comp
 const client = createRoute({ getParentRoute: () => root, path: "/clients/$id", component: ClientDetail });
 const proposals = createRoute({ getParentRoute: () => root, path: "/proposals", component: ProposalsList });
 // the builder uses the whole window, beside the sidebar
+const projects = createRoute({ getParentRoute: () => root, path: "/projects", component: ProjectsList });
+const project = createRoute({
+  getParentRoute: () => root, path: "/projects/$id", component: ProjectDetail,
+  validateSearch: (s: Record<string, unknown>): { tab?: string } => (typeof s.tab === "string" ? { tab: s.tab } : {}),
+});
 const importPdf = createRoute({ getParentRoute: () => root, path: "/proposals/import", component: ImportPdf });
 const fromDrive = createRoute({ getParentRoute: () => root, path: "/proposals/from-drive", component: FromDrive });
 const templates = createRoute({ getParentRoute: () => root, path: "/proposals/templates", component: TemplatesList });
@@ -36,7 +43,7 @@ const template = createRoute({ getParentRoute: () => root, path: "/proposals/tem
 const proposal = createRoute({ getParentRoute: () => root, path: "/proposals/$id", component: ProposalBuilder, staticData: { fullBleed: true } });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive]),
+  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project]),
   defaultPreload: "intent",
 });
 

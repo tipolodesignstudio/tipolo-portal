@@ -16,7 +16,7 @@ import { Checkbox, Field, Select } from "@/components/ui/fields";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/data-table";
 import { useConfirm } from "@/components/ui/confirm";
-import { cn, legacy } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { date } from "@/lib/format";
 import { settingsQuery } from "@/lib/data/settings";
 import {
@@ -215,7 +215,7 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
 
       {p.converted_project && (
         <div className="border-b border-border bg-ok-bg px-5 py-2 text-[13px] text-ok">
-          Converted to project <a className="font-medium underline" href={legacy(`/projects/${p.converted_project.id}`)}>{p.converted_project.number}</a>.
+          Converted to project <Link className="font-medium underline" to="/projects/$id" params={{ id: p.converted_project.id }}>{p.converted_project.number}</Link>.
         </div>
       )}
 
@@ -323,6 +323,7 @@ function SaveTemplateDialog({ proposal: p, blocks, items, onClose }: {
 
 function ConvertDialog({ proposal: p, items, onClose }: { proposal: Proposal; items: LineItem[]; onClose: () => void }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [start, setStart] = React.useState("");
   const [due, setDue] = React.useState("");
   const [seed, setSeed] = React.useState(true);
@@ -338,7 +339,7 @@ function ConvertDialog({ proposal: p, items, onClose }: { proposal: Proposal; it
       qc.invalidateQueries({ queryKey: proposalKeys.all });
       qc.invalidateQueries({ queryKey: ["clients"] });
       toast.success(`Project ${project.number} created`);
-      window.location.assign(legacy(`/projects/${project.id}`));
+      navigate({ to: "/projects/$id", params: { id: project.id } });
     } catch (e) { toast.error((e as Error).message); setBusy(false); }
   };
 
