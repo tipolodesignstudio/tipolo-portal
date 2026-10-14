@@ -1,5 +1,5 @@
 {
-  "name": "app",
+  "name": "tipolo-portal",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "types": "npx --yes supabase@latest gen types typescript --project-id woixzayvkbbhergpthfr --schema public > src/lib/database.types.ts",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",
