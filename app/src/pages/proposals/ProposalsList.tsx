@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { FileUp, HardDrive, LayoutTemplate, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function ProposalsList() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild><a href={legacy("/proposals/templates")}><LayoutTemplate />Templates</a></Button>
+          <Button variant="outline" asChild><Link to="/proposals/templates"><LayoutTemplate />Templates</Link></Button>
           <Button variant="outline" asChild><a href={legacy("/proposals/import")}><FileUp />Import PDF</a></Button>
           <Button variant="outline" asChild><a href={legacy("/proposals/from-drive")}><HardDrive />From Drive</a></Button>
           <Button onClick={() => setCreating(true)}><Plus />New proposal</Button>

@@ -12,9 +12,11 @@ const PAGE_W = 8.5 * 96;
 /* The preview is not a mock-up: it's proposalDocHtml(), the same markup the printer
    gets, laid out by the same document.css into real 8.5x11 sheets. If it looks right
    here it prints right. */
-export function Preview({ doc, settings, sourcePath, pdfOnly, onAttach }: {
-  doc: unknown; settings: unknown; sourcePath: string | null; pdfOnly: boolean;
-  onAttach: (f: File) => Promise<void>;
+export function Preview({ doc, settings, sourcePath = null, pdfOnly = false, docOnly = false, onAttach }: {
+  doc: unknown; settings: unknown; sourcePath?: string | null; pdfOnly?: boolean;
+  /** a template has no PDF of its own: show just the document */
+  docOnly?: boolean;
+  onAttach?: (f: File) => Promise<void>;
 }) {
   const pane = React.useRef<HTMLDivElement>(null);
   const paper = React.useRef<HTMLDivElement>(null);
@@ -59,7 +61,8 @@ export function Preview({ doc, settings, sourcePath, pdfOnly, onAttach }: {
   return (
     <div className="flex h-full min-h-0 flex-col bg-[#E9E5DA]">
       <div className="flex items-center gap-3 border-b border-border bg-bg-alt/80 px-4 py-2">
-        {pdfOnly ? <span className="text-[12px] font-medium uppercase tracking-wide text-ink-faint">Original PDF</span>
+        {pdfOnly || docOnly
+          ? <span className="text-[12px] font-medium uppercase tracking-wide text-ink-faint">{pdfOnly ? "Original PDF" : "Preview"}</span>
           : <Segmented value={mode} onChange={setMode} options={[{ value: "doc", label: "Document" }, { value: "pdf", label: "Original PDF" }]} />}
         {mode === "doc" && <>
           <Select className="h-8 w-24 text-[13px]" value={zoomMode}
@@ -76,7 +79,7 @@ export function Preview({ doc, settings, sourcePath, pdfOnly, onAttach }: {
             <div ref={paper} style={{ zoom }} className="mx-auto w-fit [&_.sheet-page]:mx-auto [&_.sheet-page]:shadow-[0_1px_3px_rgba(36,42,32,.16),0_10px_34px_rgba(36,42,32,.13)] [&_.sheet-page+.sheet-page]:mt-5"
                  dangerouslySetInnerHTML={{ __html: html }} />
           </div>
-        ) : <SourcePdf path={sourcePath} onAttach={onAttach} />}
+        ) : <SourcePdf path={sourcePath} onAttach={onAttach ?? (async () => {})} />}
       </div>
     </div>
   );

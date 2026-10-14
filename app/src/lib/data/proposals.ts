@@ -60,6 +60,24 @@ export const templatesQuery = queryOptions({
   queryFn: async () => unwrap(await supabase.from("proposal_templates").select("*").order("name")) as unknown as Template[],
 });
 
+export const templateQuery = (id: string) => queryOptions({
+  queryKey: [...proposalKeys.templates, id],
+  queryFn: async () => unwrap(await supabase.from("proposal_templates").select("*").eq("id", id).single()) as unknown as Template,
+});
+
+export async function saveTemplate(id: string | null, t: { name: string; sections: Block[]; default_line_items: LineItem[] }) {
+  const body = { name: t.name, sections: t.sections as unknown as Json, default_line_items: t.default_line_items as unknown as Json };
+  const q = id
+    ? supabase.from("proposal_templates").update(body).eq("id", id).select().single()
+    : supabase.from("proposal_templates").insert(body).select().single();
+  return unwrap(await q) as unknown as Template;
+}
+
+export async function deleteTemplate(id: string) {
+  const { error } = await supabase.from("proposal_templates").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 export const revisionsQuery = (proposalId: string) => queryOptions({
   queryKey: proposalKeys.revisions(proposalId),
   queryFn: async () => unwrap(await supabase.from("proposal_revisions").select("*")

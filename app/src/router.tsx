@@ -5,6 +5,7 @@ import { ClientsList } from "@/pages/clients/ClientsList";
 import { ClientDetail } from "@/pages/clients/ClientDetail";
 import { ProposalsList } from "@/pages/proposals/ProposalsList";
 import { ProposalBuilder } from "@/pages/proposals/ProposalBuilder";
+import { TemplateEditor, TemplatesList } from "@/pages/proposals/Templates";
 
 const root = createRootRoute({
   component: AppShell,
@@ -22,10 +23,12 @@ const clients = createRoute({ getParentRoute: () => root, path: "/clients", comp
 const client = createRoute({ getParentRoute: () => root, path: "/clients/$id", component: ClientDetail });
 const proposals = createRoute({ getParentRoute: () => root, path: "/proposals", component: ProposalsList });
 // the builder uses the whole window, beside the sidebar
+const templates = createRoute({ getParentRoute: () => root, path: "/proposals/templates", component: TemplatesList });
+const template = createRoute({ getParentRoute: () => root, path: "/proposals/templates/$id", component: TemplateEditor, staticData: { fullBleed: true } });
 const proposal = createRoute({ getParentRoute: () => root, path: "/proposals/$id", component: ProposalBuilder, staticData: { fullBleed: true } });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, clients, client, proposals, proposal]),
+  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template]),
   defaultPreload: "intent",
 });
 

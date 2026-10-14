@@ -7,7 +7,7 @@
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Check, ExternalLink, FileDown, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, FileDown, LayoutTemplate, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
@@ -20,17 +20,15 @@ import { cn, legacy } from "@/lib/utils";
 import { date } from "@/lib/format";
 import { settingsQuery } from "@/lib/data/settings";
 import {
-  convertProposal, deleteProposal, proposalKeys, proposalQuery, revisionsQuery, sourceName, sourceUrl,
+  convertProposal, deleteProposal, proposalKeys, proposalQuery, revisionsQuery, saveTemplate, sourceName, sourceUrl,
   statusPatch, updateProposal, uploadProposalSource, useUpdateProposal,
   type Proposal, type ProposalStatus,
 } from "@/lib/data/proposals";
 import {
-  KIND_LABEL, PARTS, TOKEN_HELP, lineAmount, normaliseSections, printProposal,
-  type Block, type LineItem, type Part,
+  PARTS, lineAmount, normaliseSections, printProposal, type Block, type LineItem, type Part,
 } from "@/lib/doc";
-import {
-  BlockFrame, FeeEditor, OptionalEditor, PaymentEditor, ScheduleEditor, TextBlock,
-} from "./builder/BlockEditors";
+import { FeeEditor } from "./builder/BlockEditors";
+import { BlockList } from "./builder/BlockList";
 import { RecipientPanel, RevisionsPanel } from "./builder/Panels";
 import { Preview } from "./builder/Preview";
 
@@ -57,6 +55,7 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
   const confirm = useConfirm();
   const save = useUpdateProposal();
 
+
   const editable = p.status === "draft";
   const pdfBacked = p.doc_mode === "pdf";
 
@@ -65,13 +64,12 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
   const [title, setTitle] = React.useState(p.title ?? "");
   const [scope, setScope] = React.useState(p.project_scope ?? "other");
   const [tab, setTab] = React.useState<Tab>(pdfBacked ? "client" : "cover");
-  const [active, setActive] = React.useState(-1);
   const [dirty, setDirty] = React.useState(false);
   const [mobileView, setMobileView] = React.useState<"edit" | "preview">("edit");
   const [converting, setConverting] = React.useState(false);
+  const [templating, setTemplating] = React.useState(false);
   const { data: revisions = [] } = useQuery(revisionsQuery(p.id));
 
-  const subtotal = items.reduce((s, li) => s + lineAmount(li), 0);
   const live = React.useMemo(() => ({ ...p, title, project_scope: scope, sections: blocks, line_items: items }),
     [p, title, scope, blocks, items]);
   const touched = () => setDirty(true);
@@ -102,29 +100,6 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
     shouldBlockFn: () => dirty && !window.confirm("You have unsaved changes to this proposal. Leave without saving?"),
     enableBeforeUnload: false,
   });
-
-  /* ---- blocks ---- */
-  const inTab = (i: number) => (blocks[i].part ?? "workplan") === tab;
-  const patchBlock = (i: number, patch: Partial<Block>) => { setBlocks((b) => b.map((x, k) => (k === i ? { ...x, ...patch } : x))); touched(); };
-  const moveBlock = (i: number, dir: -1 | 1) => {
-    let j = i + dir;
-    while (j >= 0 && j < blocks.length && !inTab(j)) j += dir;
-    if (j < 0 || j >= blocks.length) return;
-    setBlocks((b) => { const n = [...b]; [n[i], n[j]] = [n[j], n[i]]; return n; });
-    setActive(j); touched();
-  };
-  const deleteBlock = async (i: number) => {
-    const b = blocks[i];
-    const what = b.heading || (b.kind ? KIND_LABEL[b.kind] : "") || "this block";
-    if (!(await confirm({ title: "Delete block", message: `Delete “${what}”?`, confirm: "Delete", danger: true }))) return;
-    setBlocks((x) => x.filter((_, k) => k !== i)); setActive(-1); touched();
-  };
-  const addBlock = () => {
-    let at = blocks.length;
-    for (let i = blocks.length - 1; i >= 0; i--) if (inTab(i)) { at = i + 1; break; }
-    setBlocks((b) => [...b.slice(0, at), { part: tab as Part, level: 2, heading: "", body: "" }, ...b.slice(at)]);
-    setActive(at); touched();
-  };
 
   /* ---- status, conversion, deletion ---- */
   const setStatus = async (next: ProposalStatus) => {
@@ -187,8 +162,6 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
     : [...PARTS.map((pt) => ({ id: pt.id as Tab, label: pt.label, n: blocks.filter((b) => (b.part ?? "workplan") === pt.id).length })),
        { id: "revisions", label: "Revisions", n: revisions.length }];
 
-  const blockIdx = blocks.map((_, i) => i).filter(inTab);
-
   const editorBody = tab === "revisions" ? <RevisionsPanel proposalId={p.id} />
     : tab === "client" ? <RecipientPanel proposal={p} editable={editable} heading="Client" />
     : tab === "feesheet" ? (
@@ -198,33 +171,9 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
         <p className="mt-3 text-[12px] text-ink-faint">Read from the PDF. These lines set the project's budget when the proposal is converted, and become the Budget column of its invoices — worth checking against the PDF beside them.</p>
       </div>
     ) : (
-      <>
-        {tab === "cover" && <RecipientPanel proposal={p} editable={editable} heading="Addressed to" />}
-        <div className="space-y-2">
-          {blockIdx.length === 0 && <p className="px-4 py-6 text-sm text-ink-faint">Nothing in this part yet.</p>}
-          {blockIdx.map((i) => {
-            const b = blocks[i];
-            const onChange = (patch: Partial<Block>) => patchBlock(i, patch);
-            return (
-              <BlockFrame key={i} block={b} editable={editable} active={active === i} onFocus={() => setActive(i)}
-                onChange={onChange} onMove={(d) => moveBlock(i, d)} onDelete={() => deleteBlock(i)}>
-                {b.kind === "payment" ? <PaymentEditor block={b} editable={editable} subtotal={subtotal} onChange={onChange} />
-                  : b.kind === "schedule" ? <ScheduleEditor block={b} editable={editable} onChange={onChange} />
-                  : b.kind === "optional-fees" ? <OptionalEditor block={b} editable={editable} onChange={onChange} />
-                  : b.kind === "fees" ? <FeeEditor items={items} editable={editable} onChange={(x) => { setItems(x); touched(); }} />
-                  : b.kind === "signature" ? <p className="text-[13px] text-ink-faint">Signs off the agreement. Printed from your business name — nothing to edit.</p>
-                  : <TextBlock block={b} editable={editable} active={active === i} onChange={onChange} />}
-              </BlockFrame>
-            );
-          })}
-        </div>
-        {editable && (
-          <div className="mt-4 flex flex-wrap items-center gap-3 px-1">
-            <Button variant="subtle" size="sm" onClick={addBlock}><Plus />Add a block</Button>
-            <span className="text-[12px] text-ink-faint">Tokens: {TOKEN_HELP.slice(0, 4).map((t) => <code key={t} className="mr-1 rounded bg-bg-alt px-1">{t}</code>)}</span>
-          </div>
-        )}
-      </>
+      <BlockList key={tab} part={tab as Part} blocks={blocks} setBlocks={setBlocks} items={items} setItems={setItems}
+        editable={editable} onDirty={touched}
+        before={tab === "cover" ? <RecipientPanel proposal={p} editable={editable} heading="Addressed to" /> : undefined} />
     );
 
   const s = p.status as ProposalStatus;
@@ -259,6 +208,7 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
           </>}
           {s === "accepted" && !p.converted_project_id && <Button size="sm" onClick={() => setConverting(true)}>Convert to project</Button>}
           {s === "declined" && <Button variant="outline" size="sm" onClick={() => setStatus("draft")}>Reopen</Button>}
+          {!pdfBacked && <Button variant="ghost" size="icon" title="Save as a template" onClick={() => setTemplating(true)}><LayoutTemplate /></Button>}
           <Button variant="ghost" size="icon" title="Delete proposal" onClick={remove}><Trash2 /></Button>
         </div>
       </div>
@@ -300,7 +250,7 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
 
             <div className="flex flex-wrap gap-1 border-b border-border">
               {tabs.map((t) => (
-                <button key={t.id} onClick={() => { setTab(t.id); setActive(-1); }}
+                <button key={t.id} onClick={() => setTab(t.id)}
                   className={cn("-mb-px border-b-2 px-3 py-2 text-[13px] transition-colors",
                     tab === t.id ? "border-accent font-medium text-ink" : "border-transparent text-ink-soft hover:text-ink")}>
                   {t.label}{t.n ? <span className="ml-1.5 text-[11px] text-ink-faint">{t.n}</span> : null}
@@ -321,7 +271,53 @@ function Builder({ proposal: p, settings }: { proposal: Proposal; settings: obje
       </div>
 
       {converting && <ConvertDialog proposal={p} items={items} onClose={() => setConverting(false)} />}
+      {templating && <SaveTemplateDialog proposal={p} blocks={blocks} items={items} onClose={() => setTemplating(false)} />}
     </div>
+  );
+}
+
+/* This proposal's wording and fees as a reusable template. The client's name becomes
+   {{client.name}} so the next proposal fills itself in. */
+function SaveTemplateDialog({ proposal: p, blocks, items, onClose }: {
+  proposal: Proposal; blocks: Block[]; items: LineItem[]; onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [name, setName] = React.useState(p.title ?? "");
+  const [tokenise, setTokenise] = React.useState(true);
+  const [busy, setBusy] = React.useState(false);
+  const clientName = p.client?.name?.trim() ?? "";
+
+  const go = async () => {
+    if (!name.trim()) return toast.error("Give the template a name.");
+    setBusy(true);
+    const swap = (t?: string) => {
+      if (!t || !tokenise || clientName.length < 3) return t;
+      const re = new RegExp(clientName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?:[ \u00a0]+(?:Inc|Ltd|Limited|Corp|Co|LLC|LLP)\\.?)?", "gi");
+      return t.replace(re, "{{client.name}}");
+    };
+    try {
+      const t = await saveTemplate(null, {
+        name: name.trim(),
+        sections: blocks.map((b) => ({ ...b, heading: swap(b.heading), body: swap(b.body) })),
+        default_line_items: items.map((li) => ({ ...li })),
+      });
+      qc.invalidateQueries({ queryKey: proposalKeys.templates });
+      toast.success(`Template “${t.name}” saved`, { action: { label: "Open", onClick: () => navigate({ to: "/proposals/templates/$id", params: { id: t.id } }) } });
+      onClose();
+    } catch (e) { toast.error((e as Error).message); setBusy(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()} title="Save as template"
+      description="Its wording, tables and fee lines become a starting point for new proposals."
+      footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={go} disabled={busy}>{busy ? "Saving…" : "Save template"}</Button></>}>
+      <div className="space-y-4">
+        <Field label="Template name"><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        {clientName && <Checkbox checked={tokenise} onChange={(e) => setTokenise(e.target.checked)}
+          label={<>Replace “{clientName}” with <code className="rounded bg-bg-alt px-1">{"{{client.name}}"}</code></>} />}
+      </div>
+    </Dialog>
   );
 }
 
