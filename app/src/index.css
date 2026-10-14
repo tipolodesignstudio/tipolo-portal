@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+/* Tipolo's palette and type, from the current portal's css/app.css. */
+@theme {
+  --color-bg: #F5F2E9;
+  --color-bg-alt: #EFEBDD;
+  --color-card: #FFFFFF;
+  --color-ink: #242A20;
+  --color-ink-soft: #565C4E;
+  --color-ink-faint: #7C8A6B;
+  --color-accent: #3F4A20;
+  --color-accent-dark: #2C3616;
+  --color-border: #D8D3C4;
+
+  --color-ok-bg: #E7EDE0;
+  --color-ok: #3F4B33;
+  --color-warn-bg: #F6EED9;
+  --color-warn: #6E5A1E;
+  --color-bad-bg: #F5E3DC;
+  --color-bad: #7A3F1D;
+
+  --font-heading: "Fredoka", ui-rounded, system-ui, sans-serif;
+  --font-sans: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-family: var(--font-heading); font-weight: 500; }
+::selection { background: color-mix(in srgb, var(--color-accent) 25%, transparent); }
