@@ -8,7 +8,6 @@ import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Segmented } from "@/components/ui/fields";
 import { DataTable, EmptyState } from "@/components/ui/data-table";
 import { date, money } from "@/lib/format";
-import { legacy } from "@/lib/utils";
 import { proposalsQuery, type Proposal } from "@/lib/data/proposals";
 import { NewProposalDialog } from "./NewProposalDialog";
 
@@ -71,8 +70,8 @@ export function ProposalsList() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild><Link to="/proposals/templates"><LayoutTemplate />Templates</Link></Button>
-          <Button variant="outline" asChild><a href={legacy("/proposals/import")}><FileUp />Import PDF</a></Button>
-          <Button variant="outline" asChild><a href={legacy("/proposals/from-drive")}><HardDrive />From Drive</a></Button>
+          <Button variant="outline" asChild><Link to="/proposals/import"><FileUp />Import PDF</Link></Button>
+          <Button variant="outline" asChild><Link to="/proposals/from-drive"><HardDrive />From Drive</Link></Button>
           <Button onClick={() => setCreating(true)}><Plus />New proposal</Button>
         </div>
       </div>
@@ -89,7 +88,7 @@ export function ProposalsList() {
             onRowClick={(p) => navigate({ to: "/proposals/$id", params: { id: p.id } })}
             empty={<EmptyState title={status ? `No ${status} proposals` : "No proposals yet"}>
               Every project starts as a proposal. <button className="text-accent underline" onClick={() => setCreating(true)}>Write one</button>
-              {" "}or <a href={legacy("/proposals/import")} className="text-accent underline">import a PDF</a>.
+              {" "}or <Link to="/proposals/import" className="text-accent underline">import a PDF</Link>.
             </EmptyState>} />
         )}
 

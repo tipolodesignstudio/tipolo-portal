@@ -121,6 +121,21 @@ export function statusPatch(status: ProposalStatus): ProposalPatch {
   return patch;
 }
 
+/* An imported job keeps the number its Drive folder carries. The insert trigger only
+   draws a number when none is given; this then pushes the counter past the imported one,
+   so the next new proposal can't collide with it. */
+export async function reserveJobNumber(number: string) {
+  if (!/^\d{5}$/.test(number)) return;
+  const year = new Date().getFullYear();
+  if (number.slice(0, 2) !== String(year).slice(2)) return;      // an older year: no counter to move
+  const { data } = await supabase.from("app_settings").select("job_seq_next, job_seq_year, job_seq_start").eq("id", 1).maybeSingle();
+  const start = Number(data?.job_seq_start) || 101;
+  const next = Number(data?.job_seq_year) !== year ? start : Math.max(Number(data?.job_seq_next) || start, start);
+  const seq = Number(number.slice(2));
+  if (seq < next) return;
+  unwrap(await supabase.from("app_settings").update({ job_seq_next: seq + 1, job_seq_year: year }).eq("id", 1).select("id"));
+}
+
 export async function deleteProposal(id: string) {
   const { error } = await supabase.from("proposals").delete().eq("id", id);
   if (error) throw new Error(error.message);
