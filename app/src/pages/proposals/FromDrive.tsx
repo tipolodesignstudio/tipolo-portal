@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/data-table";
 import { supabase } from "@/lib/supabase";
-import { legacy } from "@/lib/utils";
 import { settingsQuery } from "@/lib/data/settings";
 import {
   drive, extractPdf, fileFromDrive, parseProposal, scanProjects, scanProposals,
@@ -105,7 +104,7 @@ export function FromDrive() {
       </div>
 
       {setup ? (
-        <EmptyState title="Not set up yet">{setup} {!drive.configured() ? null : <a className="text-accent underline" href={legacy("/settings")} onClick={() => { try { localStorage.setItem("tipolo.settings.tab", "drive"); } catch { /* */ } }}>Open Settings</a>}</EmptyState>
+        <EmptyState title="Not set up yet">{setup} {!drive.configured() ? null : <Link className="text-accent underline" to="/settings" onClick={() => { try { localStorage.setItem("tipolo.settings.tab", "drive"); } catch { /* */ } }}>Open Settings</Link>}</EmptyState>
       ) : !scan ? (
         <EmptyState title="Ready to scan">Reads the folders numbered {from} and up.{drive.connected() ? "" : " You'll be asked to connect Google first."}</EmptyState>
       ) : (

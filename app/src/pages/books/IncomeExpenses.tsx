@@ -13,7 +13,8 @@ import { Select } from "@/components/ui/fields";
 import { Dialog } from "@/components/ui/dialog";
 import { DataTable, EmptyState } from "@/components/ui/data-table";
 import { useConfirm } from "@/components/ui/confirm";
-import { cn, legacy } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { Link } from "@tanstack/react-router";
 import { date, money, relTime } from "@/lib/format";
 import {
   categoriesQuery, createFixedCost, deleteExpense, deleteFixedCost, deleteIncome, expensesQuery, fixedQuery, incomeQuery,
@@ -76,7 +77,7 @@ export function IncomeExpenses() {
 function SyncChip({ sync }: { sync: ReturnType<typeof useBooksSync> }) {
   if (!sync.configured) return <span className="text-[12.5px] text-ink-faint">Excel sync is off</span>;
   if (!sync.state?.drive_tracker_file_id) {
-    return <a href={legacy("/settings")} onClick={() => { try { localStorage.setItem("tipolo.settings.tab", "drive"); } catch { /* */ } }} className="text-[13px] text-accent hover:underline">Link Google Drive</a>;
+    return <Link to="/settings" onClick={() => { try { localStorage.setItem("tipolo.settings.tab", "drive"); } catch { /* */ } }} className="text-[13px] text-accent hover:underline">Link Google Drive</Link>;
   }
   if (sync.syncing) return <Badge><RefreshCw className="mr-1 size-3 animate-spin" />Updating Excel…</Badge>;
   const when = sync.state.tracker_synced_at ? `synced ${relTime(sync.state.tracker_synced_at)}` : "never synced";

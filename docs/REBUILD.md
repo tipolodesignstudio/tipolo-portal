@@ -18,17 +18,19 @@ Monograph-style project budgeting. The database stays exactly as it is.
 portal would need its $20/month plan. GitHub Pages has no such restriction, so the portal
 stays there.
 
-## How it runs while being rebuilt
+## Status (2026-10-14)
 
-- The new app is **portal.tipolo.ca** itself (decided 2026-10-13, instead of a separate
-  beta page). Its source is in `app/`.
-- The previous portal is published unchanged at **portal.tipolo.ca/legacy/**. Any screen
-  not yet rebuilt opens there from the sidebar or ⌘K, marked ↗. Same site, so the sign-in
-  and Google Drive connection are shared.
-- Old bookmarks (`/#/projects/…`) and Supabase's emailed sign-in and password-reset links
-  (`#access_token=…`) are forwarded to `/legacy/` with their link intact.
-- As each screen is rebuilt, its sidebar entry switches from the previous portal to the
-  new one (`app/src/lib/nav.ts`). When none are left, `/legacy/` is retired.
+Every screen is rebuilt: Dashboard, Clients, Proposals (builder, templates, PDF import,
+From Drive), Projects, Timesheets and the timer, Invoices, Income & Expenses, Settings.
+Password reset and old `/#/…` bookmarks are handled by the new app.
+
+The previous portal is still published, unlinked, at **portal.tipolo.ca/legacy/** as a
+fallback. Once the new one has been used for real for a few weeks, drop the `legacy`
+copy step from `.github/workflows/pages.yml` and delete `js/views/`, `js/components/` and
+the old `index.html` (keep `js/core/` and `js/print/`: the new app imports them).
+
+Development: `cd app && npm run dev`, then open `localhost:5173/?mock` to use sample data
+without signing in (`src/dev/mock.ts`, never in the published build).
 
 ## Stack
 

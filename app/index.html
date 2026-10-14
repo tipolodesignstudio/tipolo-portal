@@ -6,15 +6,12 @@
     <meta name="robots" content="noindex" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
-      // The previous portal used hash routes (/#/projects/…), and Supabase's emailed
-      // sign-in and password-reset links arrive as #access_token=…. Both belong to the
-      // previous portal at /legacy/, so hand them over, hash intact, before this app
-      // starts and reads them.
+      // The previous portal used hash routes (/#/projects/…). The pages kept their paths,
+      // so an old bookmark goes straight to the same page here. (Supabase's emailed
+      // #access_token=… links are left alone: the app reads those itself.)
       (function () {
         var h = location.hash;
-        if (h.indexOf("#/") === 0 || /access_token=|type=recovery|error_description=/.test(h)) {
-          location.replace("/legacy/" + h);
-        }
+        if (h.indexOf("#/") === 0) location.replace(h.slice(1) || "/");
       })();
     </script>
     <title>Tipolo Portal</title>

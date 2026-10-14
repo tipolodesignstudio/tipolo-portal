@@ -6,7 +6,7 @@ import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ConfirmProvider } from "@/components/ui/confirm";
 import { router } from "@/router";
-import { Login } from "@/pages/Login";
+import { Login, SetPassword } from "@/pages/Login";
 import "./index.css";
 
 // Development only: ?mock runs on sample data with a stand-in session (src/dev/mock.ts).
@@ -23,8 +23,9 @@ const queryClient = new QueryClient({
 });
 
 function Gate() {
-  const { session, loading } = useAuth();
+  const { session, loading, recovering } = useAuth();
   if (loading) return <div className="grid min-h-full place-items-center text-sm text-ink-faint">Loading…</div>;
+  if (session && recovering) return <SetPassword />;
   return session ? <RouterProvider router={router} /> : <Login />;
 }
 

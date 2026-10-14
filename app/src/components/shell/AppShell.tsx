@@ -1,10 +1,10 @@
 import * as React from "react";
 import { Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ArrowUpRight, LogOut, Menu, Search, X } from "lucide-react";
+import { LogOut, Menu, Search, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { NAV } from "@/lib/nav";
-import { cn, legacy } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CommandMenu } from "./CommandMenu";
 import { Timer } from "@/components/time/Timer";
@@ -50,21 +50,13 @@ export function AppShell() {
         <Timer />
 
         <nav className="flex flex-col gap-0.5">
-          {NAV.map((n) =>
-            n.to ? (
-              <Link key={n.label} to={n.to} className={cn(item, "text-ink-soft hover:bg-card hover:text-ink")}
-                    activeProps={{ className: "bg-card text-ink font-medium shadow-[0_1px_2px_rgb(36_42_32/0.06)]" }}
-                    activeOptions={{ exact: n.to === "/" }}>
-                <n.icon className="size-4" />{n.label}
-              </Link>
-            ) : (
-              <a key={n.label} href={legacy(n.legacy!)} className={cn(item, "group text-ink-soft hover:bg-card hover:text-ink")}
-                 title="Not rebuilt yet: opens in the previous version">
-                <n.icon className="size-4" />{n.label}
-                <ArrowUpRight className="ml-auto size-3.5 text-ink-faint opacity-0 group-hover:opacity-100" />
-              </a>
-            ),
-          )}
+          {NAV.map((n) => (
+            <Link key={n.label} to={n.to} className={cn(item, "text-ink-soft hover:bg-card hover:text-ink")}
+                  activeProps={{ className: "bg-card text-ink font-medium shadow-[0_1px_2px_rgb(36_42_32/0.06)]" }}
+                  activeOptions={{ exact: n.to === "/" }}>
+              <n.icon className="size-4" />{n.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="mt-auto border-t border-border pt-3">
@@ -89,13 +81,11 @@ export function AppShell() {
           {menuOpen && (
             // any choice in the menu closes it
             <nav className="grid grid-cols-2 gap-1 px-3 pb-3" onClick={() => setMenuOpen(false)}>
-              {NAV.map((n) => n.to ? (
+              {NAV.map((n) => (
                 <Link key={n.label} to={n.to} className={cn(item, "text-ink-soft hover:bg-card")}
                       activeProps={{ className: "bg-card text-ink font-medium" }} activeOptions={{ exact: n.to === "/" }}>
                   <n.icon className="size-4" />{n.label}
                 </Link>
-              ) : (
-                <a key={n.label} href={legacy(n.legacy!)} className={cn(item, "text-ink-soft hover:bg-card")}><n.icon className="size-4" />{n.label}</a>
               ))}
               <button onClick={() => supabase.auth.signOut()} className={cn(item, "text-ink-soft hover:bg-card")}><LogOut className="size-4" />Sign out</button>
             </nav>

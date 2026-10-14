@@ -7,6 +7,7 @@ import { ProjectsList } from "@/pages/projects/ProjectsList";
 import { ProjectDetail } from "@/pages/projects/ProjectDetail";
 import { Timesheets } from "@/pages/Timesheets";
 import { InvoicesList } from "@/pages/invoices/InvoicesList";
+import { Settings } from "@/pages/Settings";
 // the dashboard carries the charting library; other pages don't need to wait for it
 const Home = lazyRouteComponent(() => import("@/pages/Home"), "Home");
 const IncomeExpenses = lazyRouteComponent(() => import("@/pages/books/IncomeExpenses"), "IncomeExpenses");
@@ -43,6 +44,7 @@ const project = createRoute({
 });
 const invoices = createRoute({ getParentRoute: () => root, path: "/invoices", component: InvoicesList });
 const invoice = createRoute({ getParentRoute: () => root, path: "/invoices/$id", component: InvoiceBuilder, staticData: { fullBleed: true } });
+const settings = createRoute({ getParentRoute: () => root, path: "/settings", component: Settings });
 const books = createRoute({ getParentRoute: () => root, path: "/expenses", component: IncomeExpenses });
 const timesheets = createRoute({ getParentRoute: () => root, path: "/timesheets", component: Timesheets });
 const importPdf = createRoute({ getParentRoute: () => root, path: "/proposals/import", component: ImportPdf });
@@ -52,7 +54,7 @@ const template = createRoute({ getParentRoute: () => root, path: "/proposals/tem
 const proposal = createRoute({ getParentRoute: () => root, path: "/proposals/$id", component: ProposalBuilder, staticData: { fullBleed: true } });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project, timesheets, invoices, invoice, books]),
+  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project, timesheets, invoices, invoice, books, settings]),
   defaultPreload: "intent",
 });
 

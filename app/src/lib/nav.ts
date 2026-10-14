@@ -3,9 +3,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/* `to` is a screen rebuilt in the new app; `legacy` opens the current portal's version
-   until it is. Moving a screen across is a one-line change here. */
-export type NavItem = { label: string; icon: LucideIcon; to?: string; legacy?: string };
+export type NavItem = { label: string; icon: LucideIcon; to: string };
 
 export const NAV: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/" },
@@ -15,5 +13,5 @@ export const NAV: NavItem[] = [
   { label: "Timesheets", icon: Clock, to: "/timesheets" },
   { label: "Invoices", icon: Receipt, to: "/invoices" },
   { label: "Income & Expenses", icon: Wallet, to: "/expenses" },
-  { label: "Settings", icon: Settings, legacy: "/settings" },
+  { label: "Settings", icon: Settings, to: "/settings" },
 ];
