@@ -9,7 +9,7 @@
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useBlocker, useNavigate, useParams } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, FileDown, Pencil, Plus, Save, Send, Trash2, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ExternalLink, FileDown, FileText, Pencil, Plus, Save, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/data-table";
 import { useConfirm } from "@/components/ui/confirm";
 import { cn } from "@/lib/utils";
-import { formatPhone, localISO, money } from "@/lib/format";
+import { date, formatPhone, localISO, money } from "@/lib/format";
 import { settingsQuery } from "@/lib/data/settings";
 import { saveRecipient, type ProposalClient } from "@/lib/data/proposals";
 import {
@@ -43,6 +43,7 @@ export function InvoiceBuilder() {
   const prev = useQuery({ ...previousDrawsQuery(inv ?? { id, project_id: "", created_at: "" }), enabled: !!inv });
   if (isLoading || (inv && prev.isLoading)) return <div className="m-8 h-[70vh] animate-pulse rounded-lg bg-card" />;
   if (error || !inv) return <div className="p-8"><EmptyState title="Invoice not found">{(error as Error)?.message} <Link to="/invoices" className="text-accent underline">Back to invoices</Link></EmptyState></div>;
+  if (inv.doc_mode === "pdf") return <PdfInvoice key={inv.id} inv={inv} settings={settings ?? {}} />;
   return <Builder key={inv.id} inv={inv} settings={settings ?? {}} previous={prev.data ?? {}} />;
 }
 
@@ -175,6 +176,7 @@ function Builder({ inv, settings, previous }: { inv: Invoice; settings: { tax_li
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {dirty && <span className="text-[12px] text-warn">Unsaved</span>}
           {editable && <Button variant="outline" size="sm" onClick={doSave} disabled={!dirty || save.isPending}><Save />Save</Button>}
+          {inv.source_drive_url && <Button variant="outline" size="sm" asChild><a href={inv.source_drive_url} target="_blank" rel="noreferrer" title={inv.source_name ?? ""}><FileText />Filed PDF</a></Button>}
           <Button variant="outline" size="sm" onClick={() => printInvoice(live, settings, { previous: prevArr })}><FileDown />Save as PDF</Button>
           {inv.status === "draft" && <Button size="sm" onClick={finalize}><Send />Finalize &amp; send</Button>}
           {inv.status === "sent" && <><Button size="sm" onClick={() => setPaying(true)}><CheckCircle2 />Mark paid</Button>
@@ -402,6 +404,83 @@ function BillTo({ inv, editable }: { inv: Invoice; editable: boolean }) {
           </div>
         </Dialog>
       )}
+    </div>
+  );
+}
+
+/* An invoice brought in from Drive: the PDF is the invoice, so there's nothing to build.
+   The dates and the total can be corrected; the rest of its life (paid, reopened) is the
+   same as any other invoice. */
+function PdfInvoice({ inv, settings }: { inv: Invoice; settings: { income_payment_methods?: unknown } }) {
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const confirm = useConfirm();
+  const save = useInvoiceUpdate();
+  const [issue, setIssue] = React.useState(inv.issue_date ?? "");
+  const [due, setDue] = React.useState(inv.due_date ?? "");
+  const [total, setTotal] = React.useState(String(inv.total ?? ""));
+  const [paying, setPaying] = React.useState(false);
+  const amount = Math.round((Number(total.replace(/[^\d.-]/g, "")) || 0) * 100) / 100;
+  const dirty = issue !== (inv.issue_date ?? "") || due !== (inv.due_date ?? "") || amount !== Number(inv.total);
+  const paid = inv.status === "paid";
+
+  const doSave = () => save.mutate({ id: inv.id, patch: {
+    issue_date: issue || localISO(), due_date: due || null, subtotal: amount, total: amount, tax_total: 0,
+    progress_lines: [{ ...(inv.progress_lines?.[0] ?? { id: newLineId(), description: `Invoice ${inv.number}`, budget: 0 }), amount }],
+  } }, { onSuccess: () => toast.success("Saved"), onError: (e) => toast.error(e.message) });
+  const reopen = async () => {
+    if (!(await confirm({ title: "Reopen", confirm: "Reopen", message: "Reopen this invoice? It goes back to unpaid, and its income entry is removed." }))) return;
+    save.mutate({ id: inv.id, patch: { status: "sent", paid_date: null } }, { onSuccess: () => toast.success("Reopened"), onError: (e) => toast.error(e.message) });
+  };
+  const remove = async () => {
+    if (!(await confirm({ title: "Remove invoice", confirm: "Remove", danger: true,
+      message: `Remove ${inv.number} from the portal? The PDF stays in Google Drive${paid ? ", and its income entry is removed" : ""}.` }))) return;
+    try {
+      await deleteInvoice(inv.id);
+      qc.invalidateQueries({ queryKey: ["invoices"] }); qc.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Invoice removed");
+      navigate({ to: "/invoices" });
+    } catch (e) { toast.error((e as Error).message); }
+  };
+
+  return (
+    <div className="flex h-screen flex-col">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-bg px-5 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[12.5px] text-ink-faint">
+            <Link to="/invoices" className="inline-flex items-center gap-1 hover:text-ink"><ArrowLeft className="size-3.5" />Invoices</Link>
+            {inv.project && <>·<Link to="/projects/$id" params={{ id: inv.project.id }} className="hover:text-ink">{[inv.project.number, inv.project.title].filter(Boolean).join(" · ")}</Link></>}
+            {inv.project?.client && <>· <span>{inv.project.client.name}</span></>}
+          </div>
+          <h1 className="mt-0.5 flex items-center gap-2 text-xl">
+            <span className="tabular-nums">{inv.number}</span>
+            <span className="tabular-nums text-ink-soft">{money(inv.total)}</span>
+            <StatusBadge status={effectiveStatus(inv)} />
+          </h1>
+        </div>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {inv.source_drive_url && <Button variant="outline" size="sm" asChild><a href={inv.source_drive_url} target="_blank" rel="noreferrer"><ExternalLink />Open in Drive</a></Button>}
+          {inv.status === "sent" && <Button size="sm" onClick={() => setPaying(true)}><CheckCircle2 />Mark paid</Button>}
+          {paid && <Button variant="outline" size="sm" onClick={reopen}>Reopen</Button>}
+          <Button variant="ghost" size="icon" title="Remove invoice" onClick={remove}><Trash2 /></Button>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="space-y-4 overflow-y-auto p-5 md:w-[340px] md:shrink-0">
+          <p className="text-[13px] text-ink-soft">Filed in Google Drive as <span className="text-ink">{inv.source_name ?? "a PDF"}</span>. The PDF is the invoice; the portal keeps its number, dates and total.</p>
+          <Field label="Issued"><Input type="date" value={issue} onChange={(e) => setIssue(e.target.value)} /></Field>
+          <Field label="Due"><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+          <Field label="Total"><Input inputMode="decimal" value={total} disabled={paid} onChange={(e) => setTotal(e.target.value)} /></Field>
+          {paid && <p className="text-[13px] text-ink-soft">Paid {date(inv.paid_date)}{inv.payment_method ? ` by ${inv.payment_method}` : ""}. Reopen it to change the total.</p>}
+          <Button onClick={doSave} disabled={!dirty || !amount || save.isPending}><Save />Save</Button>
+        </div>
+        <div className="min-h-[60vh] min-w-0 flex-1 border-l border-border bg-bg-alt">
+          {inv.source_drive_id
+            ? <iframe title={inv.source_name ?? "Invoice PDF"} src={`https://drive.google.com/file/d/${inv.source_drive_id}/preview`} className="size-full" />
+            : <EmptyState title="No PDF linked">Link it from Invoices → From Drive.</EmptyState>}
+        </div>
+      </div>
+      {paying && <PaidDialog inv={inv} methods={(settings.income_payment_methods as string[] | undefined) ?? []} onClose={() => setPaying(false)} />}
     </div>
   );
 }

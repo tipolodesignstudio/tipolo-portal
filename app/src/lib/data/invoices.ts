@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import type { Json, Tables, TablesUpdate } from "@/lib/database.types";
 import { localISO } from "@/lib/format";
 import type { Block } from "@/lib/doc";
-import type { ProgressLine } from "@/lib/invoice-doc";
+import { newLineId, type ProgressLine } from "@/lib/invoice-doc";
 
 export type InvoiceProject = Pick<Tables<"projects">, "id" | "number" | "title" | "scope"> & {
   contact: { name: string; title: string | null; email: string | null; phone: string | null } | null;
@@ -172,4 +172,50 @@ export function useInvoiceUpdate() {
       qc.invalidateQueries({ queryKey: ["projects"] });
     },
   });
+}
+
+/* ---------------- invoices filed in Google Drive ---------------- */
+
+export type DriveLink = { source_drive_id: string; source_drive_url: string; source_name: string };
+
+// Point an invoice at its PDF in Drive. The file stays where it is.
+export const linkInvoicePdf = (id: string, link: DriveLink | null) =>
+  updateInvoice(id, link ?? { source_drive_id: null, source_drive_url: null, source_name: null });
+
+// Income already entered by hand for this payment: same amount, not tied to an invoice.
+export async function unlinkedIncomeFor(projectId: string, amount: number) {
+  const rows = unwrap(await supabase.from("income").select("id, income_date, amount, description, project_id, payment_method")
+    .is("invoice_id", null).order("income_date", { ascending: false }));
+  return rows.filter((r) => round2(r.amount) === round2(amount) && (!r.project_id || r.project_id === projectId));
+}
+
+/* An invoice that already went out, brought in from its PDF. It keeps the PDF as its
+   document (doc_mode 'pdf') and one line for the amount, so it counts toward the
+   project's billed total. The project's invoice count moves past its number so the next
+   one drawn here doesn't repeat it. Paid: the income row typed in earlier is tied to it,
+   or the usual trigger adds one. */
+export async function importDriveInvoice(p: {
+  project: { id: string; number: string | null }; number: string; issue_date: string; due_date: string | null;
+  total: number; status: "sent" | "paid"; paid_date: string | null; payment_method: string | null;
+  link: DriveLink; incomeId?: string | null;
+}) {
+  const total = round2(p.total);
+  let inv = await createInvoice({
+    project_id: p.project.id, number: p.number, doc_mode: "pdf", ...p.link,
+    issue_date: p.issue_date, sent_date: p.issue_date, due_date: p.due_date, status: "sent",
+    progress_lines: [{ id: newLineId(), description: `Invoice ${p.number}`, budget: 0, amount: total }],
+    sections: [], line_items: [], apply_taxes: false, tax_lines: [], subtotal: total, tax_total: 0, total,
+    prepared_by: await myName(),
+  });
+  const m = p.project.number && new RegExp(`^${p.project.number}-(\\d+)$`).exec(p.number);
+  if (m) {
+    const { data } = await supabase.from("projects").select("next_invoice_seq").eq("id", p.project.id).single();
+    if (data && data.next_invoice_seq <= Number(m[1]))
+      unwrap(await supabase.from("projects").update({ next_invoice_seq: Number(m[1]) + 1 }).eq("id", p.project.id).select("id"));
+  }
+  if (p.status === "paid") {
+    if (p.incomeId) unwrap(await supabase.from("income").update({ invoice_id: inv.id }).eq("id", p.incomeId).select("id"));
+    inv = await updateInvoice(inv.id, { status: "paid", paid_date: p.paid_date, payment_method: p.payment_method });
+  }
+  return inv;
 }

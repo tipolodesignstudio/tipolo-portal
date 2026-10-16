@@ -494,6 +494,10 @@ export type Database = {
       }
       invoices: {
         Row: {
+          doc_mode: string
+          source_drive_id: string | null
+          source_drive_url: string | null
+          source_name: string | null
           apply_taxes: boolean
           created_at: string
           created_by: string | null
@@ -518,6 +522,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          doc_mode?: string
+          source_drive_id?: string | null
+          source_drive_url?: string | null
+          source_name?: string | null
           apply_taxes?: boolean
           created_at?: string
           created_by?: string | null
@@ -542,6 +550,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          doc_mode?: string
+          source_drive_id?: string | null
+          source_drive_url?: string | null
+          source_name?: string | null
           apply_taxes?: boolean
           created_at?: string
           created_by?: string | null

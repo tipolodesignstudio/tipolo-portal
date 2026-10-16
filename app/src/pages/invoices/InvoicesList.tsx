@@ -1,8 +1,8 @@
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { Plus } from "lucide-react";
+import { HardDrive, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -65,7 +65,10 @@ export function InvoicesList() {
           <h1 className="text-3xl">Invoices</h1>
           <p className="mt-1 text-sm text-ink-soft">Progress bills against each project's budget.</p>
         </div>
-        <Button onClick={() => setCreating(true)}><Plus />New invoice</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild><Link to="/invoices/from-drive"><HardDrive />From Drive</Link></Button>
+          <Button onClick={() => setCreating(true)}><Plus />New invoice</Button>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">

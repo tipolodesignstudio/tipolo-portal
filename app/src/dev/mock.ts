@@ -122,7 +122,7 @@ const db: Record<string, Row[]> = {
     tax_lines: [{ label: "GST", rate: 5, enabled: true }, { label: "PST", rate: 7, enabled: true }],
     income_payment_methods: ["Business card", "E-transfer", "Cheque"],
     expense_payment_methods: ["Tipolo Credit Card", "Personal Credit Card", "Cash"],
-    drive_folder_id: "ACCTFOLDER01", drive_receipts_folder_id: "RCPTFOLDER01", drive_tracker_file_id: "TRACKERFILE1",
+    drive_folder_id: "ACCTFOLDER01", drive_projects_folder_id: "PROJFOLDER01", drive_receipts_folder_id: "RCPTFOLDER01", drive_tracker_file_id: "TRACKERFILE1",
     books_changed_at: ago(0), tracker_synced_at: ago(1) }],
   invoices: [
     { id: "i1", project_id: "p1", number: "26102-001", status: "paid", total: 970, subtotal: 970, issue_date: "2026-09-09", due_date: "2026-10-09",
@@ -229,8 +229,32 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
   new Response(body === undefined ? null : JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
 
 const realFetch = window.fetch.bind(window);
+// Google Drive: a tiny 06_Projects tree, and a token so the app counts as connected.
+const FOLDER = "application/vnd.google-apps.folder";
+const driveTree: Record<string, { id: string; name: string; mimeType: string }[]> = {
+  PROJFOLDER01: [{ id: "F26102xxxxxx", name: "26102_M ConnectLA Website", mimeType: FOLDER }, { id: "F26105xxxxxx", name: "26105_L Santos Backyard", mimeType: FOLDER }],
+  F26102xxxxxx: [{ id: "ADM26102xxxx", name: "00_Administrative", mimeType: FOLDER }],
+  ADM26102xxxx: [{ id: "INV26102xxxx", name: "Invoice", mimeType: FOLDER }],
+  INV26102xxxx: [
+    { id: "FILE26102001", name: "Invoice_26102-001.pdf", mimeType: "application/pdf" },
+    { id: "FILE26102003", name: "Invoice_26102-003.pdf", mimeType: "application/pdf" },
+    { id: "FILE26102003r1", name: "Invoice_26102-003r1.pdf", mimeType: "application/pdf" },
+  ],
+};
+sessionStorage.setItem("tipolo.gdrive.token", JSON.stringify({ access: "mock", exp: Date.now() + 36e5 }));
+async function driveApi(url: URL) {
+  const id = url.pathname.split("/files/")[1];
+  if (id && url.searchParams.get("alt") === "media") return realFetch("/_local-invoice-1.pdf");        // git-ignored; drop any invoice PDF there
+  const parent = /'([^']+)' in parents/.exec(url.searchParams.get("q") ?? "")?.[1] ?? "";
+  const folders = /mimeType = /.test(url.searchParams.get("q") ?? "");
+  const files = (driveTree[parent] ?? []).filter((f) => !folders || f.mimeType === FOLDER)
+    .map((f) => ({ ...f, parents: [parent], webViewLink: `https://drive.google.com/file/d/${f.id}/view` }));
+  return json({ files });
+}
+
 window.fetch = async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+  if (url.hostname === "www.googleapis.com" && url.pathname.startsWith("/drive/v3/")) return driveApi(url);
   if (url.pathname.startsWith("/storage/v1/object/")) {           // uploads: accept and forget
     return json({ Key: url.pathname.split("/object/")[1], Id: uid() });
   }

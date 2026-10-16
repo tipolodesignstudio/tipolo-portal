@@ -12,6 +12,7 @@ import { Settings } from "@/pages/Settings";
 const Home = lazyRouteComponent(() => import("@/pages/Home"), "Home");
 const IncomeExpenses = lazyRouteComponent(() => import("@/pages/books/IncomeExpenses"), "IncomeExpenses");
 const InvoiceBuilder = lazyRouteComponent(() => import("@/pages/invoices/InvoiceBuilder"), "InvoiceBuilder");
+const InvoicesFromDrive = lazyRouteComponent(() => import("@/pages/invoices/FromDrive"), "FromDrive");
 
 // The builder, templates and importers carry the print code and the PDF reader, so they
 // load when first opened rather than with every page.
@@ -43,6 +44,7 @@ const project = createRoute({
   validateSearch: (s: Record<string, unknown>): { tab?: string } => (typeof s.tab === "string" ? { tab: s.tab } : {}),
 });
 const invoices = createRoute({ getParentRoute: () => root, path: "/invoices", component: InvoicesList });
+const invoicesFromDrive = createRoute({ getParentRoute: () => root, path: "/invoices/from-drive", component: InvoicesFromDrive });
 const invoice = createRoute({ getParentRoute: () => root, path: "/invoices/$id", component: InvoiceBuilder, staticData: { fullBleed: true } });
 const settings = createRoute({ getParentRoute: () => root, path: "/settings", component: Settings });
 const books = createRoute({ getParentRoute: () => root, path: "/expenses", component: IncomeExpenses });
@@ -54,7 +56,7 @@ const template = createRoute({ getParentRoute: () => root, path: "/proposals/tem
 const proposal = createRoute({ getParentRoute: () => root, path: "/proposals/$id", component: ProposalBuilder, staticData: { fullBleed: true } });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project, timesheets, invoices, invoice, books, settings]),
+  routeTree: root.addChildren([home, clients, client, proposals, proposal, templates, template, importPdf, fromDrive, projects, project, timesheets, invoices, invoicesFromDrive, invoice, books, settings]),
   defaultPreload: "intent",
 });
 
