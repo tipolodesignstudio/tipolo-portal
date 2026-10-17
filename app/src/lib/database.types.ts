@@ -494,13 +494,10 @@ export type Database = {
       }
       invoices: {
         Row: {
-          doc_mode: string
-          source_drive_id: string | null
-          source_drive_url: string | null
-          source_name: string | null
           apply_taxes: boolean
           created_at: string
           created_by: string | null
+          doc_mode: string
           due_date: string | null
           id: string
           issue_date: string
@@ -514,6 +511,9 @@ export type Database = {
           project_id: string
           sections: Json
           sent_date: string | null
+          source_drive_id: string | null
+          source_drive_url: string | null
+          source_name: string | null
           status: string
           subtotal: number
           tax_lines: Json
@@ -522,13 +522,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          doc_mode?: string
-          source_drive_id?: string | null
-          source_drive_url?: string | null
-          source_name?: string | null
           apply_taxes?: boolean
           created_at?: string
           created_by?: string | null
+          doc_mode?: string
           due_date?: string | null
           id?: string
           issue_date?: string
@@ -542,6 +539,9 @@ export type Database = {
           project_id: string
           sections?: Json
           sent_date?: string | null
+          source_drive_id?: string | null
+          source_drive_url?: string | null
+          source_name?: string | null
           status?: string
           subtotal?: number
           tax_lines?: Json
@@ -550,13 +550,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          doc_mode?: string
-          source_drive_id?: string | null
-          source_drive_url?: string | null
-          source_name?: string | null
           apply_taxes?: boolean
           created_at?: string
           created_by?: string | null
+          doc_mode?: string
           due_date?: string | null
           id?: string
           issue_date?: string
@@ -570,6 +567,9 @@ export type Database = {
           project_id?: string
           sections?: Json
           sent_date?: string | null
+          source_drive_id?: string | null
+          source_drive_url?: string | null
+          source_name?: string | null
           status?: string
           subtotal?: number
           tax_lines?: Json
