@@ -15,7 +15,7 @@ import { projectsQuery } from "@/lib/data/projects";
 import { effectiveStatus, invoicesQuery } from "@/lib/data/invoices";
 import { proposalsQuery } from "@/lib/data/proposals";
 import { expensesQuery, incomeQuery } from "@/lib/data/books";
-import { mondayOf, weekQuery } from "@/lib/data/time";
+import { weekStartOf, weekQuery } from "@/lib/data/time";
 import { BudgetBar } from "@/pages/projects/ProjectsList";
 
 const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -37,14 +37,14 @@ export function Home() {
   const [now] = React.useState(() => new Date());
   const today = localISO(now);
   const year = String(now.getFullYear());
-  const monday = localISO(mondayOf(now));
+  const weekStart = localISO(weekStartOf(now));
 
   const projects = useQuery(projectsQuery({ search: "", status: "open", scope: "" }));
   const invoices = useQuery(invoicesQuery(""));
   const proposals = useQuery(proposalsQuery(""));
   const income = useQuery(incomeQuery);
   const expenses = useQuery(expensesQuery({ ...NO_FILTER }));
-  const week = useQuery(weekQuery(monday, { projectId: "", billable: "", billed: "", mine: false }, session?.user.id));
+  const week = useQuery(weekQuery(weekStart, { projectId: "", billable: "", billed: "", mine: false }, session?.user.id));
 
   const inv = invoices.data ?? [];
   const sent = inv.filter((i) => i.status === "sent");

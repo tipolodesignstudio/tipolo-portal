@@ -9,26 +9,26 @@ export type WeekEntry = Tables<"time_entries"> & {
 };
 export type TimeFilters = { projectId: string; billable: "" | "yes" | "no"; billed: "" | "unbilled" | "billed"; mine: boolean };
 
-/* Weeks run Monday to Sunday, in local time. */
-export function mondayOf(d = new Date()) {
+/* Weeks run Sunday to Saturday, in local time. */
+export function weekStartOf(d = new Date()) {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  x.setDate(x.getDate() - x.getDay());
   return x;
 }
-export function weekDays(mondayISO: string) {
-  const start = new Date(mondayISO + "T00:00:00");
+export function weekDays(startISO: string) {
+  const start = new Date(startISO + "T00:00:00");
   return Array.from({ length: 7 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return localISO(d); });
 }
-export function shiftWeek(mondayISO: string, weeks: number) {
-  const d = new Date(mondayISO + "T00:00:00");
+export function shiftWeek(startISO: string, weeks: number) {
+  const d = new Date(startISO + "T00:00:00");
   d.setDate(d.getDate() + weeks * 7);
   return localISO(d);
 }
 
-export const weekQuery = (monday: string, f: TimeFilters, userId: string | undefined) => queryOptions({
-  queryKey: ["time", "week", monday, f, f.mine ? userId : null],
+export const weekQuery = (weekStart: string, f: TimeFilters, userId: string | undefined) => queryOptions({
+  queryKey: ["time", "week", weekStart, f, f.mine ? userId : null],
   queryFn: async (): Promise<WeekEntry[]> => {
-    const days = weekDays(monday);
+    const days = weekDays(weekStart);
     let q = supabase.from("time_entries")
       .select("*, project:projects(id, number, title, client:clients(id, name))")
       .gte("entry_date", days[0]).lte("entry_date", days[6])

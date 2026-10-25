@@ -13,24 +13,24 @@ import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { hours, localISO, minutesToHM, money } from "@/lib/format";
 import { activeProjectsQuery, useTimeEntryMutations, type TimeEntry } from "@/lib/data/projects";
-import { mondayOf, shiftWeek, weekDays, weekQuery, type TimeFilters, type WeekEntry } from "@/lib/data/time";
+import { weekStartOf, shiftWeek, weekDays, weekQuery, type TimeFilters, type WeekEntry } from "@/lib/data/time";
 
 const dayLabel = (iso: string, opts: Intl.DateTimeFormatOptions) =>
   new Date(iso + "T00:00:00").toLocaleDateString("en-CA", opts);
 
 export function Timesheets() {
   const { session } = useAuth();
-  const [monday, setMonday] = React.useState(() => localISO(mondayOf()));
+  const [weekStart, setWeekStart] = React.useState(() => localISO(weekStartOf()));
   const [view, setView] = React.useState<"grid" | "list">(() => { try { return (localStorage.getItem("tipolo.time.view") as "grid" | "list") || "grid"; } catch { return "grid"; } });
   const [f, setF] = React.useState<TimeFilters>({ projectId: "", billable: "", billed: "", mine: false });
   const [dialog, setDialog] = React.useState<{ entry?: TimeEntry; prefill?: TimePrefill } | null>(null);
   const [cell, setCell] = React.useState<{ project: WeekEntry["project"]; day: string } | null>(null);
   const { data: projects = [] } = useQuery(activeProjectsQuery);
-  const { data: entries = [], isLoading, error } = useQuery({ ...weekQuery(monday, f, session?.user.id), placeholderData: (p) => p });
+  const { data: entries = [], isLoading, error } = useQuery({ ...weekQuery(weekStart, f, session?.user.id), placeholderData: (p) => p });
 
-  const days = weekDays(monday);
+  const days = weekDays(weekStart);
   const today = localISO();
-  const thisWeek = monday === localISO(mondayOf());
+  const thisWeek = weekStart === localISO(weekStartOf());
   const total = entries.reduce((s, e) => s + e.minutes, 0);
   const billable = entries.filter((e) => e.billable).reduce((s, e) => s + e.minutes, 0);
   const value = entries.filter((e) => e.billable).reduce((s, e) => s + (e.minutes / 60) * (Number(e.rate) || 0), 0);
@@ -50,9 +50,9 @@ export function Timesheets() {
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-md border border-border bg-card">
-          <button className="px-2 py-1.5 text-ink-soft hover:text-ink" title="Previous week" onClick={() => setMonday(shiftWeek(monday, -1))}><ChevronLeft className="size-4" /></button>
-          <button className={cn("border-x border-border px-3 text-[13px]", thisWeek ? "text-ink-faint" : "text-ink hover:bg-bg-alt")} disabled={thisWeek} onClick={() => setMonday(localISO(mondayOf()))}>This week</button>
-          <button className="px-2 py-1.5 text-ink-soft hover:text-ink" title="Next week" onClick={() => setMonday(shiftWeek(monday, 1))}><ChevronRight className="size-4" /></button>
+          <button className="px-2 py-1.5 text-ink-soft hover:text-ink" title="Previous week" onClick={() => setWeekStart(shiftWeek(weekStart, -1))}><ChevronLeft className="size-4" /></button>
+          <button className={cn("border-x border-border px-3 text-[13px]", thisWeek ? "text-ink-faint" : "text-ink hover:bg-bg-alt")} disabled={thisWeek} onClick={() => setWeekStart(localISO(weekStartOf()))}>This week</button>
+          <button className="px-2 py-1.5 text-ink-soft hover:text-ink" title="Next week" onClick={() => setWeekStart(shiftWeek(weekStart, 1))}><ChevronRight className="size-4" /></button>
         </div>
         <Segmented value={f.mine ? "mine" : "all"} onChange={(v) => setF((x) => ({ ...x, mine: v === "mine" }))}
           options={[{ value: "all", label: "Everyone" }, { value: "mine", label: "Mine" }]} />
@@ -114,7 +114,7 @@ function Grid({ days, today, entries, onCell }: {
   }
   const sum = (l: WeekEntry[] = []) => l.reduce((s, e) => s + e.minutes, 0);
   const dayTotal = (d: string) => sum(entries.filter((e) => e.entry_date === d));
-  const weekend = (i: number) => i >= 5;
+  const weekend = (i: number) => i === 0 || i === 6;
 
   if (!rows.size) {
     return <div className="rounded-lg border border-dashed border-border bg-card/50 px-6 py-14 text-center text-sm text-ink-soft">No time logged this week. Use <strong>Log time</strong>, or start the timer in the sidebar.</div>;
