@@ -1,6 +1,7 @@
-/* The project's unbilled time, beside the invoice. Each hour is settled one of two ways:
-   billed as an hourly line on this invoice, or covered by the fixed fee it bills (no
-   charge of its own). Either way it stops counting as "not yet invoiced". */
+/* The project's unbilled time, beside the invoice. When the invoice goes out, the database
+   posts every billable hour logged on or before its date to it (0028), so nothing here is
+   required. A draft can bill some of the hours as an hourly line first; the rest are
+   settled by the fee it bills. */
 
 import * as React from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,9 +53,9 @@ export function TimePanel({ inv, issueDate, onLines, inLines = [] }: {
         <Clock className="size-4 text-ink-faint" />
         <span className="flex-1">
           {waiting.length
-            ? <><strong className="text-warn">{minutesToHM(mins(waiting))} unbilled</strong> <span className="text-ink-soft">({money(value(waiting))}) logged up to {date(issueDate)}</span></>
+            ? <><strong className="text-warn">{minutesToHM(mins(waiting))} unbilled</strong> <span className="text-ink-soft">({money(value(waiting))}) logged up to {date(issueDate)}{inv.status === "draft" ? " — posted to this invoice when it's finalized" : ""}</span></>
             : <span className="text-ink-soft">No unbilled time up to {date(issueDate)}</span>}
-          {covered.length > 0 && <span className="text-ink-faint"> · {minutesToHM(mins(covered))} covered by this invoice</span>}
+          {covered.length > 0 && <span className="text-ink-faint"> · {minutesToHM(mins(covered))} posted to this invoice</span>}
           {taken.size > 0 && <span className="text-ink-faint"> · {taken.size} entr{taken.size === 1 ? "y" : "ies"} on hourly lines</span>}
         </span>
         {open ? <ChevronDown className="size-4 text-ink-faint" /> : <ChevronRight className="size-4 text-ink-faint" />}
@@ -82,17 +83,18 @@ export function TimePanel({ inv, issueDate, onLines, inLines = [] }: {
                 {onLines && <Button size="sm" variant="outline" disabled={!chosen.length || busy}
                   onClick={() => { onLines(timeLines(chosen, inv.project?.title ?? "Project")); setPicked(null); toast.success("Added as hourly lines — save to keep them"); }}>Bill as hourly line</Button>}
                 <Button size="sm" disabled={!chosen.length || busy}
-                  onClick={() => run(() => coverTime(inv.id, chosen.map((e) => e.id)), `${minutesToHM(mins(chosen))} marked as covered by this invoice`)}>Covered by the fee</Button>
+                  onClick={() => run(() => coverTime(inv.id, chosen.map((e) => e.id)), `${minutesToHM(mins(chosen))} posted to this invoice`)}>Post to this invoice</Button>
               </div>
               <p className="text-[12px] text-ink-faint">
-                <strong>Bill as hourly line</strong> charges the hours at their rates. <strong>Covered by the fee</strong> settles them with what this invoice already bills, at no extra charge.
+                {onLines ? <><strong>Bill as hourly line</strong> charges the hours at their rates. Whatever isn't billed as a line is settled by this invoice's fee when it's finalized — no extra charge.</>
+                  : <><strong>Post to this invoice</strong> marks the hours as billed by it, at no extra charge.</>}
               </p>
             </>
           )}
           {later.length > 0 && <p className="text-[12px] text-ink-faint">{minutesToHM(mins(later))} more is logged after this invoice's date, so it's left for the next one.</p>}
           {covered.length > 0 && (
             <div className="flex items-center gap-2 border-t border-border/70 pt-3 text-[13px]">
-              <span className="flex-1 text-ink-soft">{covered.length} entr{covered.length === 1 ? "y" : "ies"} ({minutesToHM(mins(covered))}) covered by this invoice.</span>
+              <span className="flex-1 text-ink-soft">{covered.length} entr{covered.length === 1 ? "y" : "ies"} ({minutesToHM(mins(covered))}) posted to this invoice.</span>
               <Button size="sm" variant="ghost" disabled={busy} onClick={() => run(() => releaseTime(covered.map((e) => e.id)), "Released back to unbilled")}>Release</Button>
             </div>
           )}
