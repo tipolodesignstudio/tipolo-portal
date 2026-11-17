@@ -33,6 +33,7 @@ import {
 import type { Block } from "@/lib/doc";
 import { BlockFrame, TextBlock } from "@/pages/proposals/builder/BlockEditors";
 import { Preview } from "@/pages/proposals/builder/Preview";
+import { TimePanel } from "./TimePanel";
 
 type Tab = "details" | "lines" | "payment";
 
@@ -200,6 +201,9 @@ function Builder({ inv, settings, previous }: { inv: Invoice; settings: { tax_li
               <Field label="Due date"><Input type="date" value={dueDate} readOnly={!editable} placeholder="30 days after sending" onChange={(e) => { setDueDate(e.target.value); touched(); }} /></Field>
               <Field label="Prepared by"><Input value={preparedBy} readOnly={!editable} placeholder="Your name" onChange={(e) => { setPreparedBy(e.target.value); touched(); }} /></Field>
             </div>
+
+            <TimePanel inv={inv} issueDate={issueDate || localISO()} inLines={lines.flatMap((l) => l.source_time_entry_ids ?? [])}
+              onLines={editable ? (add) => { setLines((l) => [...l, ...add.map((x) => ({ id: newLineId(), ...x }))]); setTab("lines"); touched(); } : undefined} />
 
             <div className="flex flex-wrap gap-1 border-b border-border">
               {INVOICE_PARTS.map((pt) => (
@@ -473,6 +477,7 @@ function PdfInvoice({ inv, settings }: { inv: Invoice; settings: { income_paymen
           <Field label="Total"><Input inputMode="decimal" value={total} disabled={paid} onChange={(e) => setTotal(e.target.value)} /></Field>
           {paid && <p className="text-[13px] text-ink-soft">Paid {date(inv.paid_date)}{inv.payment_method ? ` by ${inv.payment_method}` : ""}. Reopen it to change the total.</p>}
           <Button onClick={doSave} disabled={!dirty || !amount || save.isPending}><Save />Save</Button>
+          <TimePanel inv={inv} issueDate={inv.issue_date || localISO()} />
         </div>
         <div className="min-h-[60vh] min-w-0 flex-1 border-l border-border bg-bg-alt">
           {inv.source_drive_id

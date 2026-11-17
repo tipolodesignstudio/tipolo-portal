@@ -91,10 +91,9 @@ export async function projectBudgetLines(projectId: string) {
   return (rows[0]?.line_items as unknown as unknown[]) ?? [];
 }
 
-// Unbilled billable time, one line per rate, billed in full.
-export async function unbilledTimeLines(projectId: string, title: string) {
-  const entries = unwrap(await supabase.from("time_entries").select("id, minutes, rate")
-    .eq("project_id", projectId).is("invoice_id", null).eq("billable", true));
+// Billable time as invoice lines, one per rate, billed in full.
+export type TimeRow = { id: string; minutes: number; rate: number | null };
+export function timeLines(entries: TimeRow[], title: string) {
   const byRate = new Map<number, { minutes: number; ids: string[] }>();
   for (const e of entries) {
     const r = Number(e.rate || 0);
@@ -105,6 +104,36 @@ export async function unbilledTimeLines(projectId: string, title: string) {
     const amt = round2((g.minutes / 60) * rate);
     return { description: `${title} — professional services (${round2(g.minutes / 60)} h)`, budget: amt, amount: amt, source_time_entry_ids: g.ids };
   });
+}
+export async function unbilledTimeLines(projectId: string, title: string) {
+  const entries = unwrap(await supabase.from("time_entries").select("id, minutes, rate")
+    .eq("project_id", projectId).is("invoice_id", null).eq("billable", true));
+  return timeLines(entries, title);
+}
+
+/* The project's billable time, as it stands against one invoice: hours not on any
+   invoice yet (logged up to the invoice's date), and hours this invoice covers. Covered
+   time is settled by the fixed fee — it adds nothing to the total, but it's no longer
+   waiting to be billed. */
+export type InvoiceTimeEntry = Tables<"time_entries">;
+export const invoiceTimeQuery = (inv: Pick<Invoice, "id" | "project_id" | "issue_date">) => queryOptions({
+  queryKey: ["time", "invoice", inv.id, inv.issue_date],
+  queryFn: async () => {
+    const rows = unwrap(await supabase.from("time_entries").select("*")
+      .eq("project_id", inv.project_id).eq("billable", true).or(`invoice_id.is.null,invoice_id.eq.${inv.id}`)
+      .order("entry_date"));
+    return {
+      open: rows.filter((e) => !e.invoice_id && (!inv.issue_date || e.entry_date <= inv.issue_date)),
+      later: rows.filter((e) => !e.invoice_id && inv.issue_date && e.entry_date > inv.issue_date),
+      covered: rows.filter((e) => e.invoice_id === inv.id),
+    };
+  },
+});
+export async function coverTime(invoiceId: string, ids: string[]) {
+  if (ids.length) unwrap(await supabase.from("time_entries").update({ invoice_id: invoiceId }).in("id", ids).select("id"));
+}
+export async function releaseTime(ids: string[]) {
+  if (ids.length) unwrap(await supabase.from("time_entries").update({ invoice_id: null }).in("id", ids).select("id"));
 }
 
 // Unbilled billable expenses, with their markup, billed in full.
