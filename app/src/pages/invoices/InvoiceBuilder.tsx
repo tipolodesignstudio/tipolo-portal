@@ -12,7 +12,6 @@ import { Link, useBlocker, useNavigate, useParams } from "@tanstack/react-router
 import { ArrowLeft, CheckCircle2, ExternalLink, FileDown, FileText, Pencil, Plus, Save, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox, Field, Select } from "@/components/ui/fields";
 import { Dialog } from "@/components/ui/dialog";
@@ -23,7 +22,7 @@ import { date, formatPhone, localISO, money } from "@/lib/format";
 import { settingsQuery } from "@/lib/data/settings";
 import { saveRecipient, type ProposalClient } from "@/lib/data/proposals";
 import {
-  deleteInvoice, effectiveStatus, finalizeInvoice, invoiceKeys, invoiceQuery, previousDrawsQuery, useInvoiceUpdate,
+  deleteInvoice, finalizeInvoice, invoiceKeys, invoiceQuery, previousDrawsQuery, useInvoiceUpdate,
   type Invoice,
 } from "@/lib/data/invoices";
 import {
@@ -34,6 +33,7 @@ import type { Block } from "@/lib/doc";
 import { BlockFrame, TextBlock } from "@/pages/proposals/builder/BlockEditors";
 import { Preview } from "@/pages/proposals/builder/Preview";
 import { TimePanel } from "./TimePanel";
+import { PaymentStatus } from "./PaymentStatus";
 
 type Tab = "details" | "lines" | "payment";
 
@@ -156,7 +156,6 @@ function Builder({ inv, settings, previous }: { inv: Invoice; settings: { tax_li
     setBlocks((b) => [...b.slice(0, at), { part: tab, level: 0, heading: "", body: "" }, ...b.slice(at)]); setActive(at); touched();
   };
 
-  const st = effectiveStatus(inv);
   const client = inv.project?.client ?? null;
 
   return (
@@ -171,7 +170,7 @@ function Builder({ inv, settings, previous }: { inv: Invoice; settings: { tax_li
           <h1 className="mt-0.5 flex items-center gap-2 text-xl">
             <span className="tabular-nums">{inv.number ?? "Draft"}</span>
             <span className="tabular-nums text-ink-soft">{money(totals.total)}</span>
-            <StatusBadge status={st} />
+            <PaymentStatus inv={inv} />
           </h1>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -459,7 +458,7 @@ function PdfInvoice({ inv, settings }: { inv: Invoice; settings: { income_paymen
           <h1 className="mt-0.5 flex items-center gap-2 text-xl">
             <span className="tabular-nums">{inv.number}</span>
             <span className="tabular-nums text-ink-soft">{money(inv.total)}</span>
-            <StatusBadge status={effectiveStatus(inv)} />
+            <PaymentStatus inv={inv} />
           </h1>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">

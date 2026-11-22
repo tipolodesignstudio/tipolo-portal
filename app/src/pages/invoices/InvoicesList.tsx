@@ -4,7 +4,6 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
 import { HardDrive, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox, Field, Segmented, Select } from "@/components/ui/fields";
 import { Dialog } from "@/components/ui/dialog";
@@ -18,6 +17,7 @@ import {
 import {
   budgetLinesFromProposal, computeProgressTotals, defaultInvoiceSections, newLineId, type TaxDef,
 } from "@/lib/invoice-doc";
+import { PaymentStatus } from "./PaymentStatus";
 
 type Filter = "" | "draft" | "sent" | "overdue" | "paid";
 
@@ -41,8 +41,8 @@ const columns: ColumnDef<Invoice, unknown>[] = [
     cell: ({ row: { original: i } }) => <span className={effectiveStatus(i) === "overdue" ? "text-[13px] text-bad" : "text-[13px] text-ink-soft"}>{date(i.due_date) || "—"}</span> },
   { id: "total", header: "Total", accessorFn: (i) => Number(i.total) || 0, meta: { align: "right", className: "w-32" },
     cell: ({ getValue }) => money(getValue() as number) },
-  { id: "status", header: "Status", accessorFn: (i) => effectiveStatus(i), meta: { className: "w-28" },
-    cell: ({ row: { original: i } }) => <StatusBadge status={effectiveStatus(i)} /> },
+  { id: "status", header: "Status", accessorFn: (i) => effectiveStatus(i), meta: { className: "w-32" },
+    cell: ({ row: { original: i } }) => <div><PaymentStatus inv={i} />{i.status === "paid" && i.paid_date && <div className="mt-0.5 text-[11.5px] text-ink-faint">{date(i.paid_date)}</div>}</div> },
 ];
 
 export function InvoicesList() {
