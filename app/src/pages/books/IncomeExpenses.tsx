@@ -15,9 +15,9 @@ import { DataTable, EmptyState } from "@/components/ui/data-table";
 import { useConfirm } from "@/components/ui/confirm";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
-import { date, money, relTime } from "@/lib/format";
+import { date, hours, money, relTime } from "@/lib/format";
 import {
-  categoriesQuery, createFixedCost, deleteExpense, deleteFixedCost, deleteIncome, expensesQuery, fixedQuery, incomeQuery,
+  categoriesQuery, createFixedCost, deleteExpense, deleteFixedCost, deleteIncome, expensesQuery, fixedQuery, incomeQuery, labourCost, labourQuery, unratedMinutes,
   pickerProjectsQuery, updateFixedCost, type Expense, type ExpenseFilters, type FixedCost, type Income,
 } from "@/lib/data/books";
 import { drive, planImport, runImport, summarise, type ImportPlan } from "@/lib/books";
@@ -203,20 +203,27 @@ function SummaryTab() {
   const { data: expenses = [] } = useQuery(expensesQuery({ projectId: "", categoryId: "", billable: "", billed: "" }));
   const { data: income = [] } = useQuery(incomeQuery);
   const { data: categories = [] } = useQuery(categoriesQuery);
-  const years = [...new Set([...expenses.map((e) => e.expense_date), ...income.map((i) => i.income_date)].filter(Boolean).map((d) => d.slice(0, 4)))].sort().reverse();
+  const { data: time = [] } = useQuery(labourQuery);
+  const years = [...new Set([...expenses.map((e) => e.expense_date), ...income.map((i) => i.income_date), ...time.map((t) => t.entry_date)].filter(Boolean).map((d) => d.slice(0, 4)))].sort().reverse();
   const [year, setYear] = React.useState(() => String(new Date().getFullYear()));
   const inYear = (d: string | null) => !year || (d ?? "").startsWith(year);
   const all = summarise(expenses, income, categories);
   const s = summarise(expenses.filter((e) => inYear(e.expense_date)), income.filter((i) => inYear(i.income_date)), categories);
+  const lab = time.filter((t) => inYear(t.entry_date));
+  const labour = labourCost(lab);
+  const unrated = unratedMinutes(lab);
+  const spent = s.expenses + labour;
+  const net = s.income - spent;
   const monthly = MONTH.map((m, k) => {
     const key = `${year}-${String(k + 1).padStart(2, "0")}`;
     return {
       month: m,
       Income: income.filter((i) => i.income_date.startsWith(key)).reduce((a, i) => a + Number(i.amount || 0), 0),
       Expenses: expenses.filter((e) => e.expense_date.startsWith(key)).reduce((a, e) => a + Number(e.amount || 0), 0),
+      Labour: labourCost(time.filter((t) => t.entry_date.startsWith(key))),
     };
   });
-  const max = Math.max(1, ...s.categories.map((c) => c.total));
+  const max = Math.max(1, labour, ...s.categories.map((c) => c.total));
 
   return (
     <div className="space-y-5">
@@ -230,12 +237,12 @@ function SummaryTab() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           ["Spent today", money(all.today), ""], ["Spent this month", money(all.month), ""],
-          ["Income", money(s.income), year || "all time"], ["Expenses", money(s.expenses), year || "all time"],
-          ["Net", money(s.net), "income − expenses"],
+          ["Income", money(s.income), year || "all time"], ["Expenses", money(spent), labour ? `incl. ${money(labour)} staff time` : year || "all time"],
+          ["Net", money(net), "income − expenses"],
         ].map(([k, v, d], idx) => (
           <div key={k} className="rounded-lg border border-border bg-card px-4 py-3">
             <div className="text-[11.5px] uppercase tracking-wide text-ink-faint">{k}</div>
-            <div className={cn("mt-1 font-heading text-xl tabular-nums", idx === 4 && s.net < 0 && "text-bad")}>{v}</div>
+            <div className={cn("mt-1 font-heading text-xl tabular-nums", idx === 4 && net < 0 && "text-bad")}>{v}</div>
             {d && <div className="text-[12px] text-ink-soft">{d}</div>}
           </div>
         ))}
@@ -252,7 +259,8 @@ function SummaryTab() {
                 <Tooltip formatter={(v) => money(Number(v))} cursor={{ fill: "rgba(63,74,32,0.05)" }} contentStyle={{ borderRadius: 8, border: "1px solid #D8D3C4", fontSize: 13 }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="Income" fill="#3F4A20" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                <Bar dataKey="Expenses" fill="#B8A88A" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="Expenses" stackId="out" fill="#B8A88A" isAnimationActive={false} />
+                <Bar dataKey="Labour" stackId="out" fill="#D9CDB4" radius={[3, 3, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -271,9 +279,16 @@ function SummaryTab() {
                 <td className="px-4 py-2"><div className="h-2 rounded-full bg-accent/70" style={{ width: `${(c.total / max) * 100}%` }} /></td>
               </tr>
             ))}
+            {(labour > 0 || unrated > 0) && (
+              <tr className="border-b border-border/60">
+                <td className="px-4 py-2">Staff time <span className="text-[12px] text-ink-faint">{hours(lab.reduce((a, t) => a + t.minutes, 0))} h at base rates{unrated ? ` · ${hours(unrated)} h with no base rate` : ""}</span></td>
+                <td className="px-4 py-2 text-right tabular-nums">{money(labour)}</td>
+                <td className="px-4 py-2"><div className="h-2 rounded-full bg-accent/40" style={{ width: `${(labour / max) * 100}%` }} /></td>
+              </tr>
+            )}
             {s.uncategorised > 0 && <tr><td className="px-4 py-2 text-ink-faint">Uncategorized</td><td className="px-4 py-2 text-right tabular-nums">{money(s.uncategorised)}</td><td /></tr>}
           </tbody>
-          <tfoot><tr className="border-t border-border font-medium"><td className="px-4 py-2.5">Total</td><td className="px-4 py-2.5 text-right tabular-nums">{money(s.expenses)}</td><td /></tr></tfoot>
+          <tfoot><tr className="border-t border-border font-medium"><td className="px-4 py-2.5">Total</td><td className="px-4 py-2.5 text-right tabular-nums">{money(spent)}</td><td /></tr></tfoot>
         </table>
       </div>
     </div>

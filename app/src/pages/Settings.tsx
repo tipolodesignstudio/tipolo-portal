@@ -17,7 +17,7 @@ import {
   categoryCreate, categoryDelete, categoryList, categoryRename, createTier, deleteTier, saveSettings, setDefaultTier,
   settingsQuery, updateTier, uploadBranding, type Settings as S,
 } from "@/lib/data/settings";
-import { booksKeys, booksStateQuery, setBooksState } from "@/lib/data/books";
+import { booksKeys, booksStateQuery, setBooksState, setCostRate, staffQuery } from "@/lib/data/books";
 import { drive, linkAccountingFolder, linkFolder } from "@/lib/books";
 
 const TABS = [["business", "Business"], ["rates", "Rates"], ["taxes", "Taxes"], ["numbering", "Numbering"], ["lists", "Categories & lists"], ["drive", "Google Drive"]] as const;
@@ -176,6 +176,7 @@ function Rates({ s }: { s: S }) {
           <Button type="submit" variant="subtle" disabled={!name.trim()}><Plus />Add tier</Button>
         </form>
       </Card>
+      <StaffCosts />
       <Card>
         <CardTitle>Length of a day</CardTitle>
         <div className="mt-3 flex items-end gap-3">
@@ -186,6 +187,39 @@ function Rates({ s }: { s: S }) {
           {def?.hourly_rate != null && hours > 0 && <> At {money(def.hourly_rate)}/hour that's <strong>{money(Number(def.hourly_rate) * hours)}</strong> a day.</>}</p>
       </Card>
     </div>
+  );
+}
+
+/* Internal base rates: what an hour of each person costs the studio. */
+function StaffCosts() {
+  const qc = useQueryClient();
+  const { data: staff = [] } = useQuery(staffQuery);
+  const commit = async (id: string, raw: string, was: number | null) => {
+    const v = raw === "" ? null : Math.max(0, Number(raw));
+    if (v === (was == null ? null : Number(was))) return;
+    try {
+      await setCostRate(id, v);
+      qc.invalidateQueries({ queryKey: staffQuery.queryKey });
+      qc.invalidateQueries({ queryKey: ["time"] });
+      toast.success("Base rate saved");
+    } catch (e) { toast.error((e as Error).message); }
+  };
+  return (
+    <Card>
+      <CardTitle>Staff base rates</CardTitle>
+      <p className="mt-1 text-[13px] text-ink-soft">What an hour of each person's time costs the studio — their pay, without the overhead the charge-out rate carries. Every hour they log, billable or not, counts as a <strong>labour expense</strong> at this rate. Changing a rate applies to hours logged from then on; hours logged before a first rate is set take it too.</p>
+      <ul className="mt-4 divide-y divide-border/60">
+        {staff.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center gap-2 py-2">
+            <span className="min-w-40 flex-1 text-sm">{p.full_name || p.email}<span className="ml-2 text-[12px] text-ink-faint">{p.email}</span></span>
+            <span className="text-ink-faint">$</span>
+            <Input className="w-24 text-right tabular-nums" type="number" step="0.01" min="0" placeholder="—" defaultValue={p.cost_rate ?? ""}
+              onBlur={(e) => commit(p.id, e.target.value, p.cost_rate)} />
+            <span className="text-[12.5px] text-ink-faint">/ hour</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

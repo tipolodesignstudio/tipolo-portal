@@ -67,15 +67,15 @@ const db: Record<string, Row[]> = {
       start_date: "2020-02-01", due_date: "2020-04-01", budget: 1800, hourly_rate: null, contact_id: null, description: null, deliverables: [], updated_at: ago(1900) },
   ],
   time_entries: [
-    { id: "te1", project_id: "p1", entry_date: "2026-10-09", minutes: 210, billable: true, rate: 85, invoice_id: null, description: "Homepage hero options", created_at: ago(4) },
-    { id: "te2", project_id: "p1", entry_date: "2026-10-07", minutes: 150, billable: true, rate: 85, invoice_id: null, description: "Client call + revisions", created_at: ago(6) },
-    { id: "te3", project_id: "p1", entry_date: "2026-09-12", minutes: 480, billable: true, rate: 85, invoice_id: "i1", description: "Template exploration", created_at: ago(31) },
-    { id: "te4", project_id: "p1", entry_date: "2026-10-10", minutes: 45, billable: false, rate: 85, invoice_id: null, description: "Internal file setup", created_at: ago(3) },
+    { id: "te1", project_id: "p1", entry_date: "2026-10-09", minutes: 210, billable: true, rate: 85, cost_rate: 45, invoice_id: null, description: "Homepage hero options", created_at: ago(4) },
+    { id: "te2", project_id: "p1", entry_date: "2026-10-07", minutes: 150, billable: true, rate: 85, cost_rate: 45, invoice_id: null, description: "Client call + revisions", created_at: ago(6) },
+    { id: "te3", project_id: "p1", entry_date: "2026-09-12", minutes: 480, billable: true, rate: 85, cost_rate: 45, invoice_id: "i1", description: "Template exploration", created_at: ago(31) },
+    { id: "te4", project_id: "p1", entry_date: "2026-10-10", minutes: 45, billable: false, rate: 85, cost_rate: 45, invoice_id: null, description: "Internal file setup", created_at: ago(3) },
     // this week, so the timesheet has something on it
-    { id: "te5", project_id: "p1", entry_date: thisWeek(1), minutes: 240, billable: true, rate: 85, invoice_id: null, description: "Inner page layouts", created_by: "u-mock", created_at: ago(2) },
-    { id: "te6", project_id: "p1", entry_date: thisWeek(1), minutes: 60, billable: true, rate: 85, invoice_id: null, description: "Image research", created_by: "u-other", created_at: ago(2) },
-    { id: "te7", project_id: "p2", entry_date: thisWeek(2), minutes: 90, billable: true, rate: 95, invoice_id: null, description: "Site visit", created_by: "u-mock", created_at: ago(1) },
-    { id: "te8", project_id: "p2", entry_date: thisWeek(2), minutes: 30, billable: false, rate: 95, invoice_id: null, description: "Travel", created_by: "u-mock", created_at: ago(1) },
+    { id: "te5", project_id: "p1", entry_date: thisWeek(1), minutes: 240, billable: true, rate: 85, cost_rate: 45, invoice_id: null, description: "Inner page layouts", created_by: "u-mock", created_at: ago(2) },
+    { id: "te6", project_id: "p1", entry_date: thisWeek(1), minutes: 60, billable: true, rate: 85, cost_rate: 45, invoice_id: null, description: "Image research", created_by: "u-other", created_at: ago(2) },
+    { id: "te7", project_id: "p2", entry_date: thisWeek(2), minutes: 90, billable: true, rate: 95, cost_rate: 45, invoice_id: null, description: "Site visit", created_by: "u-mock", created_at: ago(1) },
+    { id: "te8", project_id: "p2", entry_date: thisWeek(2), minutes: 30, billable: false, rate: 95, cost_rate: 45, invoice_id: null, description: "Travel", created_by: "u-mock", created_at: ago(1) },
   ],
   expenses: [
     { id: "ex1", project_id: "p1", expense_date: "2026-09-20", description: "Stock photography", amount: 64.5, category_id: "ec-mk", billable: true, markup_pct: 10, invoice_id: null, payment_method: "Tipolo Credit Card", created_at: ago(24) },
@@ -114,6 +114,10 @@ const db: Record<string, Row[]> = {
   proposal_templates: [
     { id: "t1", name: "Website design", sections: [{ part: "workplan", level: 1, heading: "Work Plan", body: "Website for {{client.name}}." }],
       default_line_items: [{ description: "Discovery", qty: 1, unit_price: 600 }] },
+  ],
+  profiles: [
+    { id: "u-mock", email: "jim@example.com", full_name: "jim", cost_rate: 45 },
+    { id: "u-other", email: "staff@example.com", full_name: "staff", cost_rate: null },
   ],
   staff_tiers: [{ id: "st1", name: "Principal Designer", hourly_rate: 85, is_default: true, sort_order: 0 }],
   app_settings: [{ id: "1", business_name: "Tipolo Design Studio", email: "hello@tipolo.ca", phone: "604.729.0597",

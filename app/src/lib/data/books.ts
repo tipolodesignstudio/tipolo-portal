@@ -119,3 +119,24 @@ export async function invoicesByNumber(numbers: string[]) {
   return unwrap(await supabase.from("invoices").select("id, number, project_id, project:project_id(client_id)").in("number", numbers)) as unknown as
     { id: string; number: string; project_id: string; project: { client_id: string } | null }[];
 }
+
+/* ---- labour: every hour logged, at the internal base rate of whoever logged it ----
+   The charge-out rate a client pays carries overhead; the base rate (profiles.cost_rate,
+   copied onto each entry when logged) is what the hour costs the studio. */
+export type LabourEntry = { entry_date: string; minutes: number; cost_rate: number | null; project_id: string };
+export const labourQuery = queryOptions({
+  queryKey: ["time", "labour"],
+  queryFn: async () => unwrap(await supabase.from("time_entries").select("entry_date, minutes, cost_rate, project_id")) as LabourEntry[],
+});
+export const labourCost = (l: { minutes: number; cost_rate: number | null }[]) =>
+  l.reduce((s, e) => s + (e.minutes / 60) * (Number(e.cost_rate) || 0), 0);
+export const unratedMinutes = (l: { minutes: number; cost_rate: number | null }[]) =>
+  l.reduce((s, e) => s + (e.cost_rate == null ? e.minutes : 0), 0);
+
+export type StaffProfile = { id: string; email: string; full_name: string | null; cost_rate: number | null };
+export const staffQuery = queryOptions({
+  queryKey: ["staff"],
+  queryFn: async () => unwrap(await supabase.from("profiles").select("id, email, full_name, cost_rate").order("email")) as StaffProfile[],
+});
+export const setCostRate = async (id: string, cost_rate: number | null) =>
+  unwrap(await supabase.from("profiles").update({ cost_rate }).eq("id", id).select("id").single());

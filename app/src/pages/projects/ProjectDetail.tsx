@@ -51,6 +51,7 @@ export function ProjectDetail() {
   const budget = p.budget != null ? Number(p.budget) : (work?.proposals ?? []).reduce((s, x) => s + Number(x.subtotal || 0), 0) || null;
   const minutes = time.reduce((s, e) => s + e.minutes, 0);
   const unbilled = time.filter((e) => e.billable && !e.invoice_id).reduce((s, e) => s + (e.minutes / 60) * (Number(e.rate) || 0), 0);
+  const labour = time.reduce((s, e) => s + (e.minutes / 60) * (Number(e.cost_rate) || 0), 0);
   const rate = p.hourly_rate ?? p.client?.default_rate ?? settings?.default_hourly_rate ?? null;
 
   const openSource = async () => {
@@ -96,7 +97,7 @@ export function ProjectDetail() {
         <Card className="py-4">
           <div className="text-[12px] uppercase tracking-wide text-ink-faint">Hours logged</div>
           <div className="mt-1 font-heading text-2xl">{hours(minutes)}</div>
-          <div className="text-[12.5px] text-ink-soft">{rate != null ? `${money(rate)}/hr` : "no rate"}</div>
+          <div className="text-[12.5px] text-ink-soft">{rate != null ? `${money(rate)}/hr` : "no rate"}{labour > 0 && ` · ${money(labour)} cost to the studio`}</div>
         </Card>
         <Card className="py-4">
           <div className="text-[12px] uppercase tracking-wide text-ink-faint">Not yet invoiced</div>

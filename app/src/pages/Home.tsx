@@ -14,7 +14,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { projectsQuery } from "@/lib/data/projects";
 import { effectiveStatus, invoicesQuery } from "@/lib/data/invoices";
 import { proposalsQuery } from "@/lib/data/proposals";
-import { expensesQuery, incomeQuery } from "@/lib/data/books";
+import { expensesQuery, incomeQuery, labourCost, labourQuery } from "@/lib/data/books";
 import { weekStartOf, weekQuery } from "@/lib/data/time";
 import { BudgetBar } from "@/pages/projects/ProjectsList";
 
@@ -44,6 +44,7 @@ export function Home() {
   const proposals = useQuery(proposalsQuery(""));
   const income = useQuery(incomeQuery);
   const expenses = useQuery(expensesQuery({ ...NO_FILTER }));
+  const labour = useQuery(labourQuery);
   const week = useQuery(weekQuery(weekStart, { projectId: "", billable: "", billed: "", mine: false }, session?.user.id));
 
   const inv = invoices.data ?? [];
@@ -59,11 +60,13 @@ export function Home() {
   const weekMin = sum(week.data ?? [], (e) => e.minutes);
   const weekBillable = sum((week.data ?? []).filter((e) => e.billable), (e) => e.minutes);
   const incomeYear = sum(inc, (i) => i.amount);
-  const expenseYear = sum(exp, (e) => e.amount);
+  const lab = (labour.data ?? []).filter((e) => e.entry_date.startsWith(year));
+  const labourYear = labourCost(lab);
+  const expenseYear = sum(exp, (e) => e.amount) + labourYear;
 
   const monthly = MONTH.map((m, k) => {
     const key = `${year}-${String(k + 1).padStart(2, "0")}`;
-    return { month: m, Income: sum(inc.filter((i) => i.income_date.startsWith(key)), (i) => i.amount), Expenses: sum(exp.filter((e) => e.expense_date.startsWith(key)), (e) => e.amount) };
+    return { month: m, Income: sum(inc.filter((i) => i.income_date.startsWith(key)), (i) => i.amount), Expenses: sum(exp.filter((e) => e.expense_date.startsWith(key)), (e) => e.amount), Labour: labourCost(lab.filter((e) => e.entry_date.startsWith(key))) };
   }).slice(0, now.getMonth() + 1);
 
   const active = (projects.data ?? []).filter((p) => p.status === "active" || p.status === "lead" || p.status === "on_hold")
@@ -71,7 +74,7 @@ export function Home() {
 
   const handle = session?.user.email?.split("@")[0] ?? "";
   const first = handle ? handle[0].toUpperCase() + handle.slice(1) : "";
-  const err = [projects, invoices, proposals, income, expenses].find((q) => q.error)?.error as Error | undefined;
+  const err = [projects, invoices, proposals, income, expenses, labour].find((q) => q.error)?.error as Error | undefined;
   const shortDate = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric" });
 
   return (
@@ -113,14 +116,15 @@ export function Home() {
                 <Tooltip formatter={(v) => money(Number(v))} cursor={{ fill: "rgba(63,74,32,0.05)" }} contentStyle={{ borderRadius: 8, border: "1px solid #D8D3C4", fontSize: 13 }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 <Bar dataKey="Income" fill="#3F4A20" radius={[3, 3, 0, 0]} isAnimationActive={false} />
-                <Bar dataKey="Expenses" fill="#B8A88A" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                <Bar dataKey="Expenses" stackId="out" fill="#B8A88A" isAnimationActive={false} />
+                <Bar dataKey="Labour" stackId="out" fill="#D9CDB4" radius={[3, 3, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </Card>
         <div className="grid gap-4">
           <Stat label={`Income ${year}`} value={money(incomeYear)} to="/expenses" />
-          <Stat label={`Expenses ${year}`} value={money(expenseYear)} to="/expenses" />
+          <Stat label={`Expenses ${year}`} value={money(expenseYear)} sub={labourYear ? `incl. ${money(labourYear)} staff time` : undefined} to="/expenses" />
           <Stat label="Net" value={money(incomeYear - expenseYear)} sub="income − expenses" tone={incomeYear < expenseYear ? "bad" : undefined} />
         </div>
       </div>

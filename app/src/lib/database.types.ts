@@ -604,6 +604,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          cost_rate: number | null
           created_at: string
           email: string
           full_name: string | null
@@ -612,6 +613,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cost_rate?: number | null
           created_at?: string
           email: string
           full_name?: string | null
@@ -620,6 +622,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cost_rate?: number | null
           created_at?: string
           email?: string
           full_name?: string | null
@@ -895,6 +898,7 @@ export type Database = {
       }
       time_entries: {
         Row: {
+          cost_rate: number | null
           billable: boolean
           created_at: string
           created_by: string | null
@@ -908,6 +912,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cost_rate?: number | null
           billable?: boolean
           created_at?: string
           created_by?: string | null
@@ -921,6 +926,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cost_rate?: number | null
           billable?: boolean
           created_at?: string
           created_by?: string | null
